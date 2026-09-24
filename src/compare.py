@@ -1,7 +1,7 @@
 """Tabela porównawcza wszystkich modeli na zbiorze egzaminacyjnym (wariant oracle).
 
-Prognozy modeli czyta z outputs/ (tworzą je skrypty run_*), baseline'y liczy od nowa z treningu.
-Wszystkie metryki z jednej wspólnej funkcji (src/metrics.py).
+Prognozy modeli czyta z outputs/ (zapisuje je src.run_models), baseline'y liczy od nowa z treningu.
+Metryki liczy src/metrics.py.
 """
 import pandas as pd
 
@@ -27,12 +27,12 @@ GROUPS = {
 
 
 def load_forecasts(split: Split) -> pd.DataFrame:
-    """Prognozy egzaminacyjne wszystkich modeli: baseline'y policzone teraz, reszta z outputs/."""
+    """Prognozy egzaminacyjne wszystkich modeli. Baseline'y liczymy tutaj, resztę czytamy z outputs/."""
     return forecasts_from_outputs(split.y_train, split.y_test.index)
 
 
 def forecasts_from_outputs(y_train: pd.Series, exam_index: pd.DatetimeIndex) -> pd.DataFrame:
-    """To samo co `load_forecasts`, ale wystarczy sprzedaż treningowa i oś dat egzaminu (bez surowych danych)."""
+    """Jak `load_forecasts`, ale wystarczy sprzedaż treningowa i daty egzaminu, bez surowego CSV."""
     frames = [all_baselines(y_train)]
     for filename, (columns, script) in SOURCES.items():
         path = cfg.OUTPUT_DIR / filename

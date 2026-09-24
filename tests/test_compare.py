@@ -10,7 +10,7 @@ from src.data import daily_sales, load_raw, split_train_test
 from src.features import daily_exog
 from src.metrics import compute_metrics
 
-# MAE z README.md (wariant oracle, zbiór egzaminacyjny). Zmiana modelu bez aktualizacji wyników zepsuje ten test.
+# MAE z README.md (egzamin, wariant oracle). Po zmianie modelu trzeba tu wpisać nowe liczby.
 EXPECTED_MAE = {
     "naive": 2460.1, "seasonal naive": 2595.4, "średnia 28 dni": 1053.5,
     "ARIMAX": 405.8, "SARIMAX": 409.3,

@@ -1,7 +1,7 @@
-"""Ostateczne prognozy wszystkich modeli na zbiór egzaminacyjny (wariant oracle).
+"""Końcowe prognozy wszystkich modeli na zbiór egzaminacyjny (wariant oracle).
 
-Każdy model uczy się wyłącznie na danych treningowych, a parametry i wagi bierze z config.py
-(wybrane wcześniej walidacją kroczącą). Skrypt zapisuje do outputs/ pięć plików z prognozami:
+Modele uczą się tylko na treningu, parametry i wagi biorą z config.py. Skrypt zapisuje do outputs/
+pięć plików:
 forecasts_arimax.csv, forecasts_ridge.csv, forecasts_lgbm.csv, forecasts_lgbm_series.csv i forecasts_ensemble.csv.
 
 Użycie: python -m src.run_models
@@ -35,14 +35,14 @@ def ridge_forecast(split: Split) -> pd.Series:
 
 
 def lgbm_forecasts(raw: pd.DataFrame, split: Split) -> tuple[pd.Series, pd.DataFrame]:
-    """Prognozy globalnego LightGBM: suma dzienna oraz prognozy per seria sklep × produkt."""
+    """Prognozy globalnego LightGBM: suma dzienna i prognozy dla każdej serii sklep × produkt."""
     exam_days = split.y_test.index
     per_series = fit_predict(build_panel(raw), cfg.TRAIN_END, exam_days, cfg.LGBM_PARAMS)
     return daily_total(per_series).reindex(exam_days).rename("LightGBM"), per_series
 
 
 def ensemble_forecasts(components: pd.DataFrame) -> pd.DataFrame:
-    """Składniki ensemble plus dwie kolumny z ich połączeniem: zwykłą i ważoną średnią."""
+    """Prognozy składników ensemble oraz ich zwykła i ważona średnia."""
     return components.assign(
         **{
             ENSEMBLE_SIMPLE: components.mean(axis=1),
@@ -52,7 +52,7 @@ def ensemble_forecasts(components: pd.DataFrame) -> pd.DataFrame:
 
 
 def all_forecasts(raw: pd.DataFrame, split: Split) -> dict[str, pd.DataFrame]:
-    """Wszystkie prognozy egzaminacyjne; klucze to nazwy plików wynikowych."""
+    """Wszystkie prognozy egzaminacyjne w słowniku {nazwa pliku: tabela}."""
     arimax_part = arimax_forecasts(split)
     ridge_part = ridge_forecast(split)
     lgbm_daily, lgbm_series = lgbm_forecasts(raw, split)

@@ -1,10 +1,10 @@
 """Globalny LightGBM: jeden model dla wszystkich 100 serii (sklep × produkt), prognozy sumowane do dnia.
 
-Ochrona przed wyciekiem danych:
-- cechy ze sprzedaży to lag co najmniej HORIZON (28) dni oraz średnie kroczące liczone od tego lagu,
-  więc dla każdego dnia prognozy sięgają tylko do dni sprzed początku 28-dniowego okna prognozy
-  (dotyczy walidacji kroczącej i egzaminu), bez prognozy rekurencyjnej;
-- sprzedaż z okresu po TRAIN_END jest przed budową cech zamieniana na NaN, więc nie ma jak wejść do cech;
+Jak unikamy wycieku danych:
+- cechy ze sprzedaży mają opóźnienie co najmniej HORIZON (28) dni, średnie kroczące też liczymy od tego
+  opóźnienia, więc każdy dzień prognozy widzi tylko sprzedaż sprzed okna prognozy i nie trzeba
+  prognozować rekurencyjnie,
+- sprzedaż po TRAIN_END zamieniamy na NaN przed liczeniem cech,
 - cena, rabat, Demand, Inventory Level, Units Ordered i ceny konkurencji nie są cechami.
 """
 import itertools
@@ -19,10 +19,10 @@ from src.validation import walk_forward_folds
 LAG = cfg.HORIZON
 assert LAG >= cfg.HORIZON, "lag krótszy niż horyzont oznacza wyciek danych"
 
-# Cechy kategoryczne: identyfikacja serii i pogoda sklepu (znana lub prognozowana z góry, wariant oracle).
+# Cechy kategoryczne: identyfikatory serii i pogoda w sklepie (w wariancie oracle znana z góry).
 CATEGORICAL = ["store", "product", "category", "region", "weather"]
 # Zmienne zewnętrzne na poziomie wiersza: epidemia i to, czy produkt jest w promocji.
-# Rabatu nie bierzemy: powiela promocję (README.md, 2026-09-23).
+# Rabatu nie bierzemy, bo powiela promocję.
 KNOWN = ["epidemic", "promotion"]
 # Historia sprzedaży serii, zawsze z opóźnieniem >= LAG dni.
 LAGS = ["lag_28", "roll7_lag28", "roll28_lag28"]
@@ -43,7 +43,7 @@ PARAM_GRID = {
 
 
 def build_panel(raw: pd.DataFrame) -> pd.DataFrame:
-    """Panel: jeden wiersz na (dzień, sklep, produkt), z cechami i celem `y`. Cechy ze sprzedaży bez wycieku."""
+    """Panel z jednym wierszem na (dzień, sklep, produkt): cechy i cel `y`."""
     key = [cfg.COL_STORE, cfg.COL_PRODUCT]
     df = raw.sort_values(key + [cfg.COL_DATE]).reset_index(drop=True)
 
@@ -61,14 +61,14 @@ def build_panel(raw: pd.DataFrame) -> pd.DataFrame:
             cfg.COL_TARGET: "y",
         }
     )[["date", *CATEGORICAL, *KNOWN, *LAGS, "y"]]
-    for col in CATEGORICAL:  # stałe kategorie w całym panelu, żeby trening i prognoza kodowały je tak samo
+    for col in CATEGORICAL:  # te same kategorie w całym panelu, żeby trening i prognoza kodowały je identycznie
         panel[col] = pd.Categorical(panel[col], categories=sorted(panel[col].unique()))
     return panel
 
 
 def fit_predict(panel: pd.DataFrame, train_end: pd.Timestamp, test_dates, params: dict) -> pd.DataFrame:
-    """Naucz model na wierszach do train_end i prognozuj test_dates; zwraca prognozy per wiersz."""
-    train = panel[panel["date"] <= train_end].dropna(subset=LAGS)  # pierwsze ~55 dni nie ma pełnej historii
+    """Naucz model na wierszach do train_end i zwróć prognozy dla każdego wiersza z test_dates."""
+    train = panel[panel["date"] <= train_end].dropna(subset=LAGS)  # pierwsze ok. 55 dni nie ma pełnej historii
     test = panel[panel["date"].isin(test_dates)]
     model = lgb.LGBMRegressor(**BASE_PARAMS, **params)
     model.fit(train[FEATURES], train["y"])

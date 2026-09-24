@@ -10,7 +10,7 @@ from src.oof import MODELS
 
 
 def toy_oof(errors, end=cfg.TRAIN_END) -> pd.DataFrame:
-    """Rzeczywistość 1000; model A myli się dokładnie o `errors` (błąd = rzeczywistość − prognoza).
+    """Rzeczywistość 1000; model A myli się dokładnie o `errors` (błąd = rzeczywistość - prognoza).
 
     Oś dat kończy się w `end` (domyślnie w ostatnim dniu treningu).
     """

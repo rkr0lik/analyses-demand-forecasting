@@ -40,7 +40,7 @@ class SplitTest(unittest.TestCase):
         self.assertFalse(any("price" in col.lower() for col in EXOG_COLUMNS), "Price jest poza modelami")
 
     def test_discount_is_not_a_feature_anywhere(self):
-        """Rabat powiela promocję i został usunięty (README.md); nie może wrócić ani do modeli dziennych, ani do LightGBM."""
+        """Rabat powiela promocję, więc nie może trafić ani do modeli dziennych, ani do LightGBM."""
         from src.lgbm import FEATURES
 
         self.assertFalse(any("discount" in col.lower() for col in EXOG_COLUMNS), EXOG_COLUMNS)
@@ -48,7 +48,7 @@ class SplitTest(unittest.TestCase):
         self.assertNotIn("discount_mean", self.split.X_train.columns)
 
     def test_changing_test_sales_does_not_change_train_or_features(self):
-        """Wyciek: jeśli cechy lub trening zależą od sprzedaży z egzaminu, ta zmiana coś ruszy."""
+        """Jeśli cechy albo trening zależą od sprzedaży z egzaminu, ta zmiana coś w nich przesunie."""
         altered = self.raw.copy()
         in_test = altered[cfg.COL_DATE] >= cfg.TEST_START
         altered.loc[in_test, cfg.COL_TARGET] *= 1000

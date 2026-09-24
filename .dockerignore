@@ -1,5 +1,5 @@
-# Biała lista: do obrazu trafia tylko to, czego potrzebuje aplikacja. Plik z danymi (demand_forecasting.csv),
-# testy, historia gita, środowisko wirtualne i pliki lokalne nie mają jak się tam znaleźć.
+# Najpierw wykluczamy wszystko, potem dopuszczamy tylko to, czego potrzebuje aplikacja.
+# Plik z danymi, testy, .git i .venv nie trafią więc do obrazu.
 *
 
 !requirements-app.txt
@@ -9,6 +9,6 @@
 !.streamlit/
 !outputs/
 
-# Wyjątki w wyjątkach
+# ale bez cache Pythona
 **/__pycache__
 **/*.pyc

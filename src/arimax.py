@@ -1,6 +1,6 @@
-"""ARIMAX: regresja na zmiennych zewnętrznych + "pamięć" błędów (ARIMA).
+"""ARIMAX, czyli regresja na zmiennych zewnętrznych z "pamięcią" błędów (ARIMA).
 
-Dobór rzędu (p, d, q) wyłącznie walidacją kroczącą na danych treningowych.
+Rząd (p, d, q) wybieramy walidacją kroczącą na danych treningowych.
 Prognozy w walidacji i na egzaminie dostają prawdziwe zmienne zewnętrzne (wariant oracle).
 
 Uruchomienie siatki rzędów:
@@ -18,11 +18,11 @@ import config as cfg
 from src.metrics import compute_metrics
 from src.validation import walk_forward_folds
 
-MAXITER = 500  # domyślne 50 iteracji nie wystarcza optymalizatorowi (ostrzeżenie o niezbieżności)
+MAXITER = 500  # przy domyślnych 50 iteracjach optymalizator często nie zbiega
 NO_SEASON = (0, 0, 0, 0)
 ORDER_GRID = [(p, d, q) for p in (0, 1, 2) for d in (0, 1) for q in (0, 1, 2)]
 
-# Wariant sezonowy (SARIMAX): czołówka rzędów nie-sezonowych × rzędy sezonowe o okresie tygodnia.
+# SARIMAX: najlepsze rzędy bez sezonowości łączone z rzędami sezonowymi o okresie 7 dni.
 SEASON = 7
 SEASONAL_BASE_ORDERS = [(0, 1, 1), (1, 1, 1), (0, 1, 2), (1, 1, 2)]
 SEASONAL_ORDERS = [(1, 0, 0, SEASON), (0, 0, 1, SEASON), (1, 0, 1, SEASON), (0, 1, 1, SEASON), (1, 1, 1, SEASON)]
@@ -30,8 +30,8 @@ SEASONAL_ORDERS = [(1, 0, 0, SEASON), (0, 0, 1, SEASON), (1, 0, 1, SEASON), (0, 
 
 def fit_forecast(y_train, X_train, X_future, order, seasonal_order=NO_SEASON) -> pd.Series:
     """Naucz model na (y_train, X_train) i prognozuj dni z X_future."""
-    scale = y_train.mean()  # sprzedaż ~9000 -> ~1, bo optymalizator statsmodels lepiej zbiega na małych liczbach
-    # Stała tylko bez różnicowania; przy różnicowaniu stała oznaczałaby dryf.
+    scale = y_train.mean()  # skalujemy ~9000 do ~1, bo statsmodels lepiej zbiega na małych liczbach
+    # Stała tylko bez różnicowania, przy d > 0 oznaczałaby dryf.
     trend = "c" if order[1] == 0 and seasonal_order[1] == 0 else None
     model = SARIMAX(y_train / scale, exog=X_train, order=order, seasonal_order=seasonal_order, trend=trend)
     result = model.fit(disp=False, maxiter=MAXITER)
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     table = grid_search(y, X)
     print(table.round(1).to_string())
 
-    # Punkt odniesienia w tej samej walidacji: średnia z 28 dni.
+    # Dla porównania: średnia z 28 dni w tej samej walidacji.
     base_mae = [
         compute_metrics(y.loc[f.test], mean_window(y[: f.train[-1]]).to_numpy())["MAE"]
         for f in walk_forward_folds(y.index)

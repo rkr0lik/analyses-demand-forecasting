@@ -34,7 +34,7 @@ class RidgeTest(unittest.TestCase):
         self.assertLess(self.effect(1e5), self.effect(0.001))
 
     def test_cv_score_returns_all_metrics(self):
-        from src.validation import walk_forward_folds  # noqa: F401  (import sprawdza, że walidacja jest dostępna)
+        from src.validation import walk_forward_folds  # noqa: F401 (sprawdzamy tylko, czy import działa)
         import config as cfg
 
         y, X = synthetic(cfg.CV_MIN_TRAIN_DAYS + cfg.CV_FOLDS * cfg.HORIZON)
@@ -74,7 +74,7 @@ class YearCycleTest(unittest.TestCase):
         self.assertTrue(widened.notna().all().all())
 
     def test_forecast_uses_the_cycle_by_default(self):
-        """Prognoza z cyklem różni się od prognozy bez niego — czyli cykl faktycznie wchodzi do modelu."""
+        """Prognoza z cyklem różni się od prognozy bez niego, więc cykl naprawdę trafia do modelu."""
         y, X = synthetic(400)
         future = pd.DataFrame({"epidemic": 0.0}, index=pd.date_range(y.index[-1] + pd.Timedelta(days=1), periods=28))
         with_cycle = fit_forecast(y, X, future, alpha=1.0)

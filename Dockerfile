@@ -1,6 +1,5 @@
-# Obraz z aplikacją Streamlit (prognoza dziennej sprzedaży na 28 dni).
-# Aplikacja niczego nie uczy: czyta gotowe wyniki z outputs/, więc nie potrzebuje pliku z danymi
-# ani bibliotek do uczenia modeli (statsmodels, scikit-learn, lightgbm) i obraz jest dzięki temu mały.
+# Obraz z aplikacją Streamlit. Aplikacja czyta gotowe wyniki z outputs/, więc w obrazie nie ma pliku
+# z danymi ani bibliotek do uczenia modeli (statsmodels, scikit-learn, lightgbm).
 #
 #   docker build -t forecast-app .
 #   docker run --rm -p 127.0.0.1:8501:8501 forecast-app     # potem: http://localhost:8501
@@ -11,16 +10,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Użytkownik bez uprawnień administratora.
+# Aplikacja działa na zwykłym użytkowniku, nie na root.
 RUN useradd --create-home --uid 10001 appuser
 
 WORKDIR /srv/forecast
 
-# Zależności najpierw: dzięki temu ta warstwa jest w cache, dopóki requirements-app.txt się nie zmieni.
+# Zależności instalujemy przed kopiowaniem kodu, żeby ta warstwa zostawała w cache, dopóki nie zmieni się requirements-app.txt.
 COPY requirements-app.txt ./
 RUN pip install -r requirements-app.txt
 
-# Kod aplikacji i gotowe wyniki (lista plików ogranicza się do tego, co dopuszcza .dockerignore).
+# Kod i gotowe wyniki. To, co może się tu dostać, ogranicza .dockerignore.
 COPY --chown=appuser:appuser config.py ./
 COPY --chown=appuser:appuser src ./src
 COPY --chown=appuser:appuser app ./app
@@ -31,9 +30,9 @@ USER appuser
 
 EXPOSE 8501
 
-# Curl nie ma w obrazie slim, więc zdrowie sprawdzamy Pythonem.
+# W obrazie slim nie ma curla, więc healthcheck robimy Pythonem.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=4)"
 
-# W kontenerze nasłuchujemy na wszystkich interfejsach; na zewnątrz port wystawia docker run.
+# 0.0.0.0, żeby port był dostępny spoza kontenera (wystawia go docker run -p).
 CMD ["streamlit", "run", "app/streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8501"]

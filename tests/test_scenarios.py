@@ -1,4 +1,4 @@
-"""Testy scenariuszy epidemii: definicja scenariusza, zgodność scenariusza N=6 z prawdziwym egzaminem, kształt plików."""
+"""Testy scenariuszy epidemii: flaga w scenariuszu, zgodność N=6 z egzaminem i kształt plików."""
 import unittest
 
 import pandas as pd
@@ -11,7 +11,7 @@ from src.oof import MODELS
 from src.ensemble import ENSEMBLE_SIMPLE, ENSEMBLE_WEIGHTED, with_ensembles
 from src.scenarios import epidemic_flags, scenario_components
 
-REAL_EPIDEMIC_DAYS = 6  # 3–8.01.2024
+REAL_EPIDEMIC_DAYS = 6  # 3-8.01.2024
 OUT = cfg.OUTPUT_DIR
 HAVE_DATA = cfg.DATA_PATH.exists()
 HAVE_EXAM_FORECASTS = all((OUT / f).exists() for f in ("forecasts_arimax.csv", "forecasts_ridge.csv", "forecasts_lgbm.csv"))

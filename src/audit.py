@@ -1,13 +1,12 @@
-"""Kontrola poprawności projektu: przelicza wyniki niezależnie i szuka słabych punktów analizy.
+"""Kontrola poprawności: przelicza wyniki jeszcze raz i szuka słabych punktów analizy.
 
-Skrypt nie zmienia modeli. Sprawdza cztery rzeczy i zapisuje je do outputs/, żeby dokumentacja mogła
-brać z nich liczby zamiast przepisywać je ręcznie:
+Modeli nie zmienia. Wyniki trafiają do outputs/, skąd biorą je tabele w dokumentacji. Sprawdzamy:
 
 1. czy metryki w tabeli porównawczej dają się odtworzyć z zapisanych prognoz,
 2. jak wygląda błąd modelu w poszczególnych miesiącach (sezonowość roczna),
-3. ile sezonowość roczna daje w walidacji kroczącej i co dała Ridge poza nią,
+3. ile daje cykl roczny w Ridge w walidacji kroczącej i poza nią,
 4. czy różnice między modelami na egzaminie są istotne statystycznie,
-5. kilka pojedynczych liczb kontrolnych, do których odwołuje się dokumentacja.
+5. kilka pojedynczych liczb, które cytuje dokumentacja.
 
 Użycie: python -m src.audit
 """
@@ -31,7 +30,7 @@ SEASONAL_WAVES = 2  # wariant porównawczy w tabeli poniżej (Ridge używa cfg.R
 
 
 def recomputed_metrics(split) -> pd.DataFrame:
-    """Metryki policzone od nowa z zapisanych prognoz, obok metryk z tabeli porównawczej."""
+    """Metryki policzone od nowa z zapisanych prognoz, obok tych z tabeli porównawczej."""
     saved = pd.read_csv(cfg.OUTPUT_DIR / "comparison.csv", index_col="model")
     rows = {}
     for filename, (columns, _) in SOURCES.items():
@@ -46,7 +45,7 @@ def recomputed_metrics(split) -> pd.DataFrame:
 
 
 def month_effects(y_train: pd.Series, X_train: pd.DataFrame) -> pd.DataFrame:
-    """Średni błąd regresji treningowej w każdym miesiącu: ile sprzedaży model nie tłumaczy."""
+    """Średni błąd regresji treningowej w poszczególnych miesiącach, czyli czego zmienne nie tłumaczą."""
     fit = sm.OLS(y_train, sm.add_constant(X_train[EXOG_COLUMNS])).fit()
     resid = y_train - fit.predict(sm.add_constant(X_train[EXOG_COLUMNS]))
     grouped = resid.groupby(resid.index.month)
@@ -57,10 +56,9 @@ def month_effects(y_train: pd.Series, X_train: pd.DataFrame) -> pd.DataFrame:
 
 
 def seasonality_gain(y_train: pd.Series, X_train: pd.DataFrame, alphas=(1, 3, 10, 30, 100, 300)) -> pd.DataFrame:
-    """Ile sezonowość roczna daje Ridge? Ocena wyłącznie walidacją kroczącą na treningu.
+    """Ile cykl roczny daje Ridge w walidacji kroczącej na treningu.
 
-    Ridge używa dziś cfg.RIDGE_YEAR_WAVES par fal; ta tabela pokazuje warianty obok siebie,
-    łącznie z wariantem bez cyklu (waves=0), na którym model stał wcześniej.
+    Porównuje różne liczby par fal, w tym waves=0 (bez cyklu). Model używa cfg.RIDGE_YEAR_WAVES.
     """
     def cv(waves):
         best = None
@@ -87,8 +85,8 @@ def year_cycle_check(y_train, X_train, split) -> pd.DataFrame:
     """Ridge z cyklem rocznym i bez niego: na egzaminie oraz w kontrolnym styczniu rok wcześniej.
 
     Styczeń 2023 leży w okresie treningowym, więc ten sam układ dat co egzamin można przećwiczyć
-    rok wcześniej bez dotykania zbioru egzaminacyjnego. Tabela pokazuje, że zysk widoczny
-    w walidacji (tabela wyżej) nie dotyczy stycznia.
+    rok wcześniej, nie ruszając zbioru egzaminacyjnego. Poprawa widoczna w walidacji
+    (tabela wyżej) na styczniu się nie pojawia.
     """
     january_end = cfg.TRAIN_END - pd.DateOffset(years=1)  # 2.01.2023
     january = pd.date_range(january_end + pd.Timedelta(days=1), periods=cfg.HORIZON)
@@ -105,7 +103,7 @@ def year_cycle_check(y_train, X_train, split) -> pd.DataFrame:
 
 
 def extra_checks(raw: pd.DataFrame, split, months: pd.DataFrame) -> pd.DataFrame:
-    """Pojedyncze liczby kontrolne, do których odwołuje się dokumentacja."""
+    """Pojedyncze liczby, które cytuje dokumentacja."""
     daily = raw.groupby(cfg.COL_DATE)[["Demand", cfg.COL_TARGET]].sum()
     fit = sm.OLS(split.y_train, sm.add_constant(split.X_train[EXOG_COLUMNS])).fit()
     resid = split.y_train - fit.predict(sm.add_constant(split.X_train[EXOG_COLUMNS]))
@@ -131,7 +129,7 @@ def extra_checks(raw: pd.DataFrame, split, months: pd.DataFrame) -> pd.DataFrame
 
 
 def difference_tests(split) -> pd.DataFrame:
-    """Czy różnice błędów między modelami na 28 dniach egzaminu są istotne (test parowany)."""
+    """Test parowany: czy różnice błędów między modelami na 28 dniach egzaminu są istotne."""
     forecasts = {}
     for filename, (columns, _) in SOURCES.items():
         frame = pd.read_csv(cfg.OUTPUT_DIR / filename, index_col="date", parse_dates=True)

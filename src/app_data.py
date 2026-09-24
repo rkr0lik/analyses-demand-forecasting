@@ -1,7 +1,6 @@
-"""Dane i logika widoków aplikacji. Wczytuje gotowe pliki z outputs/ i składa z nich widoki; niczego nie uczy.
+"""Dane dla aplikacji: wczytuje gotowe pliki z outputs/ i składa z nich widoki. Nic tu nie jest uczone.
 
-Aplikacja (app/streamlit_app.py) woła tylko te funkcje oraz wspólną funkcję metryk, więc nie potrzebuje
-pliku z surowymi danymi.
+app/streamlit_app.py korzysta tylko z tych funkcji i z src/metrics.py, więc surowy CSV nie jest potrzebny.
 """
 from typing import NamedTuple
 
@@ -21,7 +20,7 @@ EXAM_DAYS = pd.date_range(cfg.TEST_START, cfg.TEST_END)
 
 
 def real_epidemic_days(daily: pd.DataFrame) -> int:
-    """Ile dni epidemii faktycznie było na początku okresu prognozy (liczone z danych, nie wpisane na sztywno)."""
+    """Ile dni epidemii było na początku okresu prognozy (liczone z danych)."""
     flags = daily.loc[EXAM_DAYS, "epidemic"].to_numpy()
     assert set(flags) <= {0, 1}, "flaga epidemii musi być 0/1"
     first_zero = flags.argmin() if not flags.all() else len(flags)
@@ -59,7 +58,7 @@ def _read(name: str, script: str, **kwargs) -> pd.DataFrame:
 
 
 def load_outputs() -> Outputs:
-    """Wczytaj wszystkie pliki potrzebne aplikacji (tworzą je skrypty z src/)."""
+    """Wczytaj pliki potrzebne aplikacji. Tworzą je skrypty z src/."""
     daily = _read("daily_sales.csv", "src.export_actuals", index_col="date", parse_dates=True)
     forecasts = forecasts_from_outputs(daily["units_sold"][: cfg.TRAIN_END], EXAM_DAYS)
     return Outputs(
@@ -99,14 +98,14 @@ def build_view(outputs: Outputs, view: str, model: str, epidemic_days: int) -> V
 
 
 def exam_days_in(data: ViewData, start: pd.Timestamp, end: pd.Timestamp) -> pd.DatetimeIndex:
-    """Dni egzaminacyjne mieszczące się w wybranym zakresie dat (tylko one mają prognozę i rzeczywistość)."""
+    """Dni egzaminacyjne z wybranego zakresu dat. Tylko dla nich mamy i prognozę, i rzeczywistą sprzedaż."""
     return data.forecast.index[(data.forecast.index >= start) & (data.forecast.index <= end)]
 
 
 def metrics_for_range(data: ViewData, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame | None:
     """Metryki wybranego modelu i baseline'ów na dniach egzaminacyjnych z zakresu; None, gdy zakres ich nie obejmuje.
 
-    Kolumna 'MAE vs średnia 28 dni' to zmiana MAE względem głównego baseline'u w procentach (ujemna = lepiej).
+    Kolumna 'MAE vs średnia 28 dni' to procentowa zmiana MAE względem głównego baseline'u (ujemna znaczy lepiej).
     """
     days = exam_days_in(data, start, end)
     if days.empty:
@@ -119,7 +118,7 @@ def metrics_for_range(data: ViewData, start: pd.Timestamp, end: pd.Timestamp) ->
 
 
 def epidemic_split(data: ViewData, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame | None:
-    """Metryki wybranego modelu osobno dla dni z epidemią i bez (wspólna funkcja metryk)."""
+    """Metryki wybranego modelu osobno dla dni z epidemią i bez niej."""
     days = exam_days_in(data, start, end)
     if days.empty:
         return None
@@ -127,7 +126,7 @@ def epidemic_split(data: ViewData, start: pd.Timestamp, end: pd.Timestamp) -> pd
 
 
 def epidemic_runs(epidemic: pd.Series) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
-    """Ciągłe okresy epidemii (pierwszy i ostatni dzień każdego), do zacieniowania na wykresie."""
+    """Okresy epidemii jako pary (pierwszy dzień, ostatni dzień), do zacieniowania na wykresie."""
     flag = epidemic.astype(bool)
     run_id = (flag != flag.shift()).cumsum()
     return [(days.index[0], days.index[-1]) for _, days in flag[flag].groupby(run_id[flag])]

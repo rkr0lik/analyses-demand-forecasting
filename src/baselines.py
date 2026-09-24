@@ -1,4 +1,4 @@
-"""Proste prognozy odniesienia. Każda dostaje TYLKO dane treningowe, więc nie ma jak podejrzeć egzaminu.
+"""Proste prognozy odniesienia. Dostają wyłącznie dane treningowe, więc nie widzą egzaminu.
 
 Prognoza obejmuje `horizon` dni tuż po ostatnim dniu treningu.
 """

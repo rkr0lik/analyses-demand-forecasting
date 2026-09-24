@@ -12,7 +12,7 @@ from src.validation import walk_forward_folds
 
 class WalkForwardLayoutTest(unittest.TestCase):
     def setUp(self):
-        # Krótka oś kończąca się w TRAIN_END, z obniżonym minimum uczenia na potrzeby małego przykładu.
+        # Krótka oś kończąca się w TRAIN_END; minimum uczenia obniżone, żeby przykład był mały.
         self.index = pd.date_range(end=cfg.TRAIN_END, periods=100)
         patcher = mock.patch.object(cfg, "CV_MIN_TRAIN_DAYS", 30)
         patcher.start()

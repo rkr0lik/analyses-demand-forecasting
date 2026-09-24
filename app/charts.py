@@ -1,8 +1,8 @@
 """Wykres sprzedaży i prognozy (Plotly) w stylu raportu Power BI.
 
-Zasady wykresu: jedna oś Y, cienkie linie (2 px), poziome siatki hairline (bez pionowych), legenda widoczna
-(kilka serii), kolory z walidowanej pary (niebieski i pomarańczowy z domyślnej palety Power BI), szary baseline jako
-element wygaszony. Podpowiedź (hover) pokazuje wszystkie wartości dla wskazanego dnia, a te same dane są w widoku tabelarycznym.
+Jedna oś Y, linie o grubości 2 px, tylko poziome linie siatki i legenda. Kolory to niebieski i pomarańczowy
+z domyślnej palety Power BI, baseline jest szary, żeby nie przykrywał reszty. Po najechaniu na dzień widać
+wszystkie wartości z tego dnia. Te same dane są też w widoku tabelarycznym.
 """
 import pandas as pd
 import plotly.graph_objects as go
@@ -12,7 +12,7 @@ from src.app_data import BASELINE_MAIN, ViewData, epidemic_runs, exam_days_in
 
 ACTUAL, FORECAST, BASELINE, EPIDEMIC_WASH = "#118DFF", "#E66C37", "#8A8886", "rgba(138,136,134,0.16)"
 INK, GRID, AXIS = "#605E5C", "#EDEBE9", "#C8C6C4"
-BAND_FILL = "rgba(230,108,55,0.16)"  # ton prognozy, ok. 16% krycia (lekka wstęga, nie blok)
+BAND_FILL = "rgba(230,108,55,0.16)"  # kolor prognozy z kryciem ok. 16%, żeby pasmo było tłem
 SEPARATORS = ", "  # przecinek dziesiętny, twarda spacja jako separator tysięcy
 
 
@@ -44,7 +44,7 @@ def build_figure(data: ViewData, start: pd.Timestamp, end: pd.Timestamp) -> go.F
         fig.add_trace(go.Scatter(x=days, y=data.baselines[BASELINE_MAIN].loc[days], name=f"Baseline: {BASELINE_MAIN}", mode="lines",
                                  line=dict(color=BASELINE, width=2), hovertemplate="%{y:,.0f}"))
 
-    # Epidemia: zacieniowane tło (bez własnej serii); wpis w legendzie przez pusty znacznik.
+    # Epidemię zaznaczamy cieniem w tle. Żeby była w legendzie, dodajemy pustą serię.
     runs = [(max(s, start), min(e, end)) for s, e in epidemic_runs(data.epidemic) if s <= end and e >= start]
     for s, e in runs:
         fig.add_vrect(x0=_iso(s - pd.Timedelta(hours=12)), x1=_iso(e + pd.Timedelta(hours=12)), fillcolor=EPIDEMIC_WASH,

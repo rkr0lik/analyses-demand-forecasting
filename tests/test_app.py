@@ -1,4 +1,4 @@
-"""Testy aplikacji Streamlit (streamlit.testing.v1.AppTest): wymagania zadania i działanie fragmentatorów."""
+"""Testy aplikacji Streamlit przez AppTest: wymagania z zadania i działanie fragmentatorów."""
 import unittest
 from datetime import date
 from pathlib import Path

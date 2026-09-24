@@ -1,6 +1,6 @@
-"""Jedna wspólna funkcja metryk dla wszystkich modeli i baseline'ów, żeby porównania były spójne.
+"""Metryki błędu wspólne dla wszystkich modeli i baseline'ów, żeby dało się je porównywać.
 
-Znak błędu: prognoza − rzeczywistość. Bias dodatni = model zawyża, ujemny = zaniża.
+Błąd = prognoza - rzeczywistość. Dodatni bias znaczy, że model zawyża, ujemny, że zaniża.
 """
 import numpy as np
 import pandas as pd

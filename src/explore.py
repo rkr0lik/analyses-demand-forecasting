@@ -1,4 +1,7 @@
-"""Neutralna eksploracja danych TRENINGOWYCH (do 2.01.2024): efekt epidemii, rytm tygodniowy, regresja, cena, ranking produktów. Okresu egzaminacyjnego nie ruszamy."""
+"""Eksploracja danych treningowych (do 2.01.2024): efekt epidemii, rytm tygodniowy, regresja, cena i ranking produktów.
+
+Okres egzaminacyjny jest tu pominięty.
+"""
 import pandas as pd
 import statsmodels.api as sm
 
@@ -21,7 +24,7 @@ def weekday_pattern(sales: pd.Series) -> None:
     by_dow = sales.groupby(sales.index.dayofweek).mean()
     spread = (by_dow.max() - by_dow.min()) / sales.mean()
     print(f"[dzień tygodnia] średnie: {by_dow.round(0).astype(int).tolist()} (pn..nd), rozstęp/średnia: {spread:.1%}")
-    # Sam rytm tygodniowy na tle epidemii może mylić, więc sprawdzamy też poza epidemią.
+    # Epidemia może zamazać rytm tygodniowy, więc liczymy go też bez dni epidemii.
 
 
 def weekday_pattern_no_epidemic(sales: pd.Series, exog: pd.DataFrame) -> None:

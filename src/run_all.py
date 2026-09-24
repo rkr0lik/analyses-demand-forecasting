@@ -1,8 +1,8 @@
-"""Uruchamia cały pipeline od zera i zapisuje wszystkie wyniki do outputs/ (potrzebny plik demand_forecasting.csv).
+"""Uruchamia cały pipeline od zera i zapisuje wyniki do outputs/. Wymaga pliku demand_forecasting.csv.
 
-Każdy krok to osobny skrypt z src/ (`python -m src.<nazwa>`), uruchamiany w kolejności zależności. Parametry modeli
-(rzędy ARIMAX, alpha Ridge, parametry LightGBM, wagi ensemble) są już w config.py, więc czasochłonne przeszukiwanie
-siatek (src.arimax, src.ridge, src.lgbm, src.ensemble) nie jest częścią tego skryptu.
+Każdy krok to osobny skrypt z src/ (`python -m src.<nazwa>`), uruchamiany w kolejności zależności.
+Parametry modeli są już w config.py, więc długiego przeszukiwania siatek (src.arimax, src.ridge, src.lgbm,
+src.ensemble) tu nie ma.
 
 Użycie: python -m src.run_all
 """
@@ -12,7 +12,7 @@ import time
 
 import config as cfg
 
-# (moduł, co robi); kolejność wynika z zależności plików w outputs/
+# (moduł, opis); kolejność wynika z tego, które pliki w outputs/ są potrzebne następnym krokom
 STEPS = [
     ("src.export_actuals", "zagregowana rzeczywista sprzedaż (suma dzienna, per produkt, flaga epidemii)"),
     ("src.run_models", "prognozy egzaminacyjne: ARIMAX, SARIMAX, Ridge, LightGBM i ensemble"),

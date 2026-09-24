@@ -5,15 +5,15 @@ import pandas as pd
 import config as cfg
 
 # Pogoda jest ustalana per sklep, więc w danych dziennych to udział sklepów z daną pogodą.
-# Cloudy zostaje poza zestawem jako kategoria odniesienia: cztery udziały sumują się do 1,
-# a modele liniowe nie lubią cech, które razem dają stałą (współliniowość).
+# Cloudy pomijamy jako kategorię odniesienia. Cztery udziały sumowałyby się do 1,
+# a modele liniowe źle znoszą cechy, które razem dają stałą.
 WEATHER_SHARES = {"Sunny": "sunny_share", "Rainy": "rainy_share", "Snowy": "snowy_share"}
 
 EXOG_COLUMNS = ["epidemic", "promo_share", *WEATHER_SHARES.values()]
 
-# Cykl roczny: sprzedaż ma silną sezonowość roczną (audyt 2026-09-22, README.md). Opisujemy ją falami
-# sin/cos dnia roku — kilka gładkich kolumn zamiast jedenastu wskaźników miesiąca. Fale zależą wyłącznie
-# od daty, więc są znane z dowolnym wyprzedzeniem i nie mogą wnieść wycieku danych.
+# Cykl roczny: sprzedaż ma wyraźną sezonowość roczną (README.md). Opisujemy ją falami sin/cos dnia roku,
+# co daje kilka gładkich kolumn zamiast jedenastu zmiennych miesięcznych. Fale zależą tylko od daty,
+# więc znamy je z dowolnym wyprzedzeniem i nie wprowadzają wycieku.
 SEASONAL_WAVES = 3  # domyślna liczba par fal (wariant wybrany walidacją kroczącą dla Ridge)
 
 
@@ -27,10 +27,10 @@ def year_waves(index: pd.DatetimeIndex, waves: int = SEASONAL_WAVES) -> pd.DataF
 
 
 def daily_exog(df: pd.DataFrame) -> pd.DataFrame:
-    """Jeden wiersz na dzień: epidemia, udział produktów w promocji, średni rabat, udziały pogody.
+    """Jeden wiersz na dzień: epidemia, udział produktów w promocji i udziały pogody.
 
-    To zmienne znane (lub planowane) niezależnie od sprzedaży. Dla dni egzaminacyjnych podajemy
-    prawdziwe wartości, czyli wariant oracle.
+    Te wartości są znane albo planowane niezależnie od sprzedaży. Dla dni egzaminacyjnych podajemy
+    prawdziwe wartości (wariant oracle).
     """
     by_day = df.groupby(cfg.COL_DATE)
     assert (by_day[cfg.COL_EPIDEMIC].nunique() == 1).all(), "Epidemic nie jest jedna na dzień"
@@ -38,9 +38,8 @@ def daily_exog(df: pd.DataFrame) -> pd.DataFrame:
     exog = pd.DataFrame(
         {
             "epidemic": by_day[cfg.COL_EPIDEMIC].first(),  # flaga dnia: 1 = epidemia
-            # Jaka część produktów jest danego dnia w promocji. Rabatu NIE bierzemy osobno: w tych danych
-            # jest funkcją promocji (bez promocji 0/5/10%, z promocją 10/15/20/25%), więc tylko powielał
-            # tę samą informację i wprowadzał współliniowość (README.md, 2026-09-23).
+            # Jaka część produktów jest danego dnia w promocji. Rabatu nie bierzemy, bo wynika z promocji
+            # (bez promocji 0/5/10%, z promocją 10/15/20/25%) i dublowałby tę samą informację.
             "promo_share": by_day[cfg.COL_PROMOTION].mean(),
         }
     )

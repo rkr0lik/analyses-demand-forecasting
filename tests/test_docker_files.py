@@ -1,4 +1,4 @@
-"""Testy statyczne plików kontenera: co trafia do obrazu, kto go uruchamia, jak sprawdzane jest zdrowie."""
+"""Testy plików Dockera: co trafia do obrazu, na jakim użytkowniku działa i jak sprawdzamy jego stan."""
 import re
 import unittest
 
@@ -68,7 +68,7 @@ class DockerfileTest(unittest.TestCase):
     def test_installs_only_app_requirements_not_the_ml_stack(self):
         self.assertIn("pip install -r requirements-app.txt", DOCKERFILE)
         self.assertNotIn("pip install -r requirements.txt", DOCKERFILE)
-        self.assertNotIn("libgomp1", DOCKERFILE)  # OpenMP był potrzebny tylko LightGBM
+        self.assertNotIn("libgomp1", DOCKERFILE)  # libgomp (OpenMP) potrzebuje tylko LightGBM
 
     def test_requirements_are_installed_before_the_code_is_copied(self):
         self.assertLess(DOCKERFILE.index("pip install -r requirements-app.txt"), DOCKERFILE.index("COPY --chown=appuser:appuser src"))

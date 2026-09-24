@@ -1,8 +1,8 @@
-"""Scenariusze epidemii: "epidemia trwa jeszcze N dni od początku okresu prognozy" (N = 0 … 28).
+"""Scenariusze epidemii: co, jeśli epidemia potrwa jeszcze N dni od początku prognozy (N od 0 do 28).
 
-W scenariuszu N flaga epidemii to 1 w pierwszych N dniach prognozy i 0 w pozostałych; pozostałe zmienne
-zewnętrzne zostają prawdziwe (wariant oracle). Modele uczą się wyłącznie na treningu, więc scenariusz zmienia
-tylko dane podawane na dni prognozy. Prognozy liczone lokalnie i zapisane do outputs/, aplikacja ich nie przelicza.
+W scenariuszu N flaga epidemii ma wartość 1 w pierwszych N dniach i 0 w pozostałych. Inne zmienne
+zewnętrzne zostają prawdziwe (wariant oracle). Modele uczą się tylko na treningu, więc scenariusz zmienia
+wyłącznie dane na dni prognozy. Wyniki trafiają do outputs/, aplikacja tylko je czyta.
 """
 import warnings
 
@@ -27,13 +27,13 @@ def epidemic_flags(index: pd.DatetimeIndex, n_days: int) -> pd.Series:
 
 
 def scenario_components(split: Split, panel: pd.DataFrame, n_days: int) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Prognozy trzech modeli dziennych (kolumny MODELS) i LightGBM per seria dla scenariusza N = n_days."""
+    """Prognozy trzech modeli dziennych (kolumny MODELS) i LightGBM dla każdej serii w scenariuszu N = n_days."""
     exam_days = split.y_test.index
     flags = epidemic_flags(exam_days, n_days)
     X_future = split.X_test.assign(epidemic=flags)
 
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", ConvergenceWarning)  # znane, nieszkodliwe (README.md)
+        warnings.simplefilter("ignore", ConvergenceWarning)  # znane i niegroźne ostrzeżenia
         arimax_pred = arimax.fit_forecast(split.y_train, split.X_train, X_future, cfg.ARIMAX_ORDER)
     ridge_pred = ridge.fit_forecast(split.y_train, split.X_train, X_future, cfg.RIDGE_ALPHA)
 
@@ -49,7 +49,7 @@ def scenario_components(split: Split, panel: pd.DataFrame, n_days: int) -> tuple
 
 
 def all_scenarios(raw: pd.DataFrame, split: Split) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Wszystkie scenariusze N = 0 … HORIZON. Zwraca: prognozy dzienne (5 modeli) i LightGBM per produkt (top 3)."""
+    """Wszystkie scenariusze od N = 0 do HORIZON. Zwraca prognozy dzienne 5 modeli i prognozy LightGBM dla 3 produktów."""
     assert split.X_test["epidemic"].tolist() == [1] * 6 + [0] * (cfg.HORIZON - 6), "egzamin: epidemia w pierwszych 6 dniach"
     panel, top = build_panel(raw), top_products(raw)
     daily_frames, product_frames = [], []

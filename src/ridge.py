@@ -1,9 +1,8 @@
 """Ridge: regresja liniowa na dziennych zmiennych zewnętrznych z "hamulcem" na współczynniki.
 
-Bez części autoregresyjnej (pamięci błędów), więc to najprostszy i najspokojniejszy składnik ensemble.
-Do zmiennych zewnętrznych dokładamy cykl roczny (fale sin/cos dnia roku), bo sprzedaż ma silną sezonowość
-roczną, której same zmienne zewnętrzne nie tłumaczą. Robi to tylko Ridge; ARIMAX dostaje ten sam X_train
-bez fal. Alpha i liczbę par fal dobraliśmy walidacją kroczącą na treningu (README.md).
+Nie ma części autoregresyjnej, więc to najprostszy składnik ensemble. Oprócz zmiennych zewnętrznych
+dostaje cykl roczny (fale sin/cos dnia roku), bo tej sezonowości zmienne zewnętrzne nie tłumaczą.
+ARIMAX dostaje ten sam X_train, ale bez fal. Alpha i liczbę par fal wybrała walidacja krocząca na treningu.
 """
 import pandas as pd
 from sklearn.linear_model import Ridge
@@ -20,7 +19,7 @@ WAVES_GRID = [0, 1, 2, 3, 4]  # 0 = bez cyklu rocznego
 
 
 def with_year_cycle(X: pd.DataFrame, waves: int) -> pd.DataFrame:
-    """Zmienne zewnętrzne plus fale cyklu rocznego (zależą wyłącznie od daty, więc bez wycieku)."""
+    """Zmienne zewnętrzne i fale cyklu rocznego. Fale zależą tylko od daty, więc nie ma tu wycieku."""
     return X if waves == 0 else pd.concat([X, year_waves(X.index, waves)], axis=1)
 
 

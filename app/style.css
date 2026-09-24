@@ -1,4 +1,4 @@
-/* Wygląd zbliżony do raportu Power BI: szare tło strony, białe karty z cienką ramką, ciemny pasek nagłówka. */
+/* Wygląd podobny do raportu Power BI: szare tło, białe karty z cienką ramką i ciemny pasek nagłówka. */
 .stApp { background: #F3F2F1; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #252423; }
 [data-testid="stHeader"] { display: none; }
 .block-container { max-width: 1440px; padding: 0 1.5rem 2rem 1.5rem; }
@@ -21,7 +21,7 @@
 .kpi-value { font-size: 34px; font-weight: 300; line-height: 1.15; color: #252423; }
 .kpi-label { font-size: 12px; color: #605E5C; margin-top: 2px; padding-bottom: 6px; }
 
-/* Widżety w kartach bez własnych etykiet i zbędnych odstępów */
+/* Widżety w kartach: bez etykiet i dodatkowych odstępów */
 [class*="st-key-card"] [data-testid="stWidgetLabel"] { display: none; }
 [class*="st-key-card"] .stSlider { padding-top: 4px; }
 [data-testid="stExpander"] { background: #fff; border: 1px solid #E1DFDD; border-radius: 2px; }

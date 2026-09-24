@@ -1,7 +1,7 @@
-"""Bonus: prognozy dla najlepiej sprzedających się produktów z globalnego LightGBM.
+"""Bonus: prognozy globalnego LightGBM dla najlepiej sprzedających się produktów.
 
-Produkty wybieramy wyłącznie na danych treningowych. Prognoza produktu to suma prognoz jego serii
-(sklep × produkt) po wszystkich sklepach, więc produkty sumują się do prognozy całości.
+Produkty wybieramy na danych treningowych. Prognoza produktu to suma prognoz jego serii
+(sklep × produkt) ze wszystkich sklepów, dzięki czemu produkty sumują się do prognozy całości.
 """
 import pandas as pd
 
@@ -18,21 +18,21 @@ def product_daily_sales(raw: pd.DataFrame) -> pd.DataFrame:
 
 
 def mean_daily_sales_by_product(raw_train: pd.DataFrame) -> pd.Series:
-    """Średnia dzienna sprzedaż produktu (suma po sklepach); przekaż tylko dane treningowe."""
+    """Średnia dzienna sprzedaż produktu (suma po sklepach). Podawaj tu tylko dane treningowe."""
     return product_daily_sales(raw_train).mean()
 
 
 def top_products(raw: pd.DataFrame, n: int = TOP_N) -> list[str]:
-    """N produktów o najwyższej średniej dziennej sprzedaży w okresie treningowym (sprzedaż egzaminacyjna pominięta)."""
+    """N produktów o najwyższej średniej dziennej sprzedaży w okresie treningowym."""
     train = raw[raw[cfg.COL_DATE] <= cfg.TRAIN_END]
     return mean_daily_sales_by_product(train).nlargest(n).index.tolist()
 
 
 def ranking_comparison(raw: pd.DataFrame, n: int = 5) -> pd.DataFrame:
-    """Ranking produktów liczony z treningu i z całości danych, żeby pokazać, że wybór zależy od okresu.
+    """Ranking produktów z treningu i z całości danych. Pokazuje, że wybór zależy od okresu.
 
-    Zadanie nie precyzuje okresu. Liczymy z treningu, bo okres egzaminacyjny nie może wpływać na żadną decyzję,
-    ale różnice na pozycjach 2-4 są rzędu jednej sztuki dziennie, więc wybór jest praktycznie remisem.
+    Zadanie nie mówi, z jakiego okresu liczyć. Liczymy z treningu, żeby egzamin nie wpływał na wybór.
+    Na miejscach 2-4 różnice to ok. sztuka dziennie, więc to w praktyce remis.
     """
     train = mean_daily_sales_by_product(raw[raw[cfg.COL_DATE] <= cfg.TRAIN_END])
     whole = mean_daily_sales_by_product(raw)

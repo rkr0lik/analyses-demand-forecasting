@@ -1,4 +1,4 @@
-"""Wczytanie danych i kontrola ich jakości. Pliku z danymi nie modyfikujemy."""
+"""Wczytanie danych i kontrola ich jakości. Sam plik CSV zostaje nietknięty."""
 from typing import NamedTuple
 
 import pandas as pd
@@ -14,7 +14,7 @@ def load_raw(path=cfg.DATA_PATH) -> pd.DataFrame:
 
 
 def check_raw(df: pd.DataFrame) -> dict:
-    """Sprawdź kompletność danych; przy naruszeniu zgłoś AssertionError. Zwraca podsumowanie."""
+    """Sprawdź kompletność danych i zwróć podsumowanie. Przy problemie rzuca AssertionError."""
     n_days = df[cfg.COL_DATE].nunique()
     n_stores = df[cfg.COL_STORE].nunique()
     n_products = df[cfg.COL_PRODUCT].nunique()
@@ -47,7 +47,7 @@ def daily_sales(df: pd.DataFrame) -> pd.Series:
 
 
 class Split(NamedTuple):
-    """Podział na trening (do TRAIN_END) i zbiór egzaminacyjny (TEST_START – TEST_END)."""
+    """Podział na trening (do TRAIN_END) i zbiór egzaminacyjny (od TEST_START do TEST_END)."""
 
     y_train: pd.Series
     y_test: pd.Series

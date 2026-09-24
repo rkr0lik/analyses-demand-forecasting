@@ -1,12 +1,12 @@
 """Aplikacja Streamlit: prognoza dziennej sprzedaży na 28 dni, w stylu raportu Power BI.
 
 Uruchomienie z katalogu głównego: streamlit run app/streamlit_app.py
-Aplikacja tylko wczytuje gotowe pliki z outputs/ (src/app_data.py) i wywołuje wspólną funkcję metryk; niczego nie uczy.
+Aplikacja nie uczy modeli. Czyta gotowe pliki z outputs/ przez src/app_data.py i liczy metryki.
 """
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # żeby `import config` i `import src` działały spod streamlit run
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # streamlit run nie dodaje katalogu głównego do ścieżki, a potrzebujemy `config` i `src`
 
 import pandas as pd
 import streamlit as st
@@ -63,7 +63,7 @@ except FileNotFoundError as error:
     st.error(f"Brakuje plików z wynikami. {error}")
     st.stop()
 
-real_epidemic = real_epidemic_days(outputs.daily)  # liczone z danych, nie wpisane na sztywno
+real_epidemic = real_epidemic_days(outputs.daily)  # z danych, nie na sztywno
 
 st.markdown(
     f'<div class="pbi-header"><span class="pbi-title">Prognoza dziennej sprzedaży na {cfg.HORIZON} dni</span>'
@@ -73,7 +73,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- Pasek fragmentatorów (jeden rząd nad wszystkim, czego dotyczy) ---
+# Fragmentatory w jednym rzędzie nad resztą strony
 slicer_view, slicer_model, slicer_range, slicer_scenario = st.columns([1.2, 1.2, 1.8, 1.8])
 with slicer_view, st.container(key="card_slicer_view"):
     card_title("Widok")
@@ -100,7 +100,7 @@ data = build_view(outputs, view, model, epidemic_days)
 table = metrics_for_range(data, start, end)
 scenario_note = "zgodnie z rzeczywistością" if epidemic_days == real_epidemic else "scenariusz hipotetyczny"
 
-# --- Karty KPI ---
+# Karty KPI
 kpis = st.columns(4)
 if table is None:
     values = ["—"] * 4
@@ -121,7 +121,7 @@ if table is None:
     st.info(f"Wybrany zakres nie obejmuje dni prognozy ({fmt_date(cfg.TEST_START)} – {fmt_date(cfg.TEST_END)}). "
             "Metryki liczymy tylko dla dni, dla których jest prognoza i sprzedaż rzeczywista.")
 
-# --- Wykres i tabela metryk ---
+# Wykres i tabela metryk
 chart_col, table_col = st.columns([3, 2])
 with chart_col, st.container(key="card_chart"):
     card_title("Sprzedaż dzienna: rzeczywista i prognoza", f"{view} · model {model} · epidemia {epidemic_days} dni ({scenario_note})")
@@ -147,7 +147,7 @@ with table_col, st.container(key="card_table"):
             column_config={c: st.column_config.NumberColumn(format="%.1f" if c == "MAPE (%)" else "%.0f") for c in ("MAE", "RMSE", "MAPE (%)", "Bias")},
         )
 
-# --- Widok tabelaryczny i opis ---
+# Widok tabelaryczny i opis
 with st.expander("Widok tabelaryczny: dane wykresu"):
     days = data.forecast.index[(data.forecast.index >= start) & (data.forecast.index <= end)]
     view_table = pd.DataFrame({"Sprzedaż rzeczywista": data.actual.loc[days], f"Prognoza: {data.model}": data.forecast.loc[days]})

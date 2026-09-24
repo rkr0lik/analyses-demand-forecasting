@@ -1,4 +1,4 @@
-"""Aplikacja nie może importować bibliotek do uczenia modeli (ciężki obraz Dockera, zbędne zależności)."""
+"""Aplikacja nie może importować bibliotek do uczenia modeli, bo nie ma ich w obrazie Dockera."""
 import subprocess
 import sys
 import unittest

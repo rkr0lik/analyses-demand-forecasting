@@ -1,8 +1,8 @@
-"""Zapis zagregowanej rzeczywistej sprzedaży do outputs/, żeby wykresy w aplikacji działały bez pliku z danymi.
+"""Zapisuje zagregowaną sprzedaż do outputs/, żeby aplikacja działała bez pliku z danymi.
 
-Zapisujemy wyłącznie agregaty: sumę dzienną i sumę dzienną per produkt (po sklepach) oraz flagę epidemii
-(0/1 na dzień; potrzebna do metryk osobno dla epidemii i do zacieniowania jej na wykresie).
-Surowe wiersze (sklep × produkt × dzień) i pozostałe kolumny zostają w pliku z danymi, którego nie ma w repozytorium.
+Do plików trafia suma dzienna, suma dzienna dla każdego produktu (po sklepach) i flaga epidemii 0/1.
+Flaga jest potrzebna do metryk w podziale na epidemię i do zacieniowania wykresu. Surowe wiersze
+(sklep × produkt × dzień) zostają w CSV, którego nie ma w repozytorium.
 """
 import pandas as pd
 

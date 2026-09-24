@@ -59,7 +59,7 @@ jobs:
           ssh deploy "IMAGE=$IMAGE TAG=${GITHUB_SHA::7} CONTAINER=$CONTAINER APP_PORT=$APP_PORT bash -s" <<'EOF'
           set -euo pipefail
           docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
-          # Zabezpieczenia: system plików tylko do odczytu, bez uprawnień jądra, bez eskalacji uprawnień.
+          # System plików tylko do odczytu, bez capabilities i bez możliwości podniesienia uprawnień.
           docker run -d \
             --name "$CONTAINER" \
             --restart unless-stopped \
@@ -84,7 +84,7 @@ jobs:
             exit 1
           fi
 
-          # Usuwamy stare wersje obrazu, żeby nie zapchać dysku (zostaje bieżąca).
+          # Kasujemy stare wersje obrazu, żeby nie zapełniły dysku.
           docker images "$IMAGE" --format '{{.Repository}}:{{.Tag}}' \
             | grep -v -e ":latest$" -e ":$TAG$" \
             | xargs -r docker rmi >/dev/null 2>&1 || true

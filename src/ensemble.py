@@ -1,7 +1,7 @@
 """Ensemble: zwykła i ważona średnia prognoz ARIMAX, LightGBM i Ridge.
 
-Wagi (nieujemne, suma 1) dobieramy prostą siatką na prognozach out-of-fold z walidacji kroczącej,
-minimalizując MAE. Zbiór egzaminacyjny nie bierze w tym udziału.
+Wagi (nieujemne, suma 1) wybieramy przeszukując siatkę na prognozach out-of-fold z walidacji
+kroczącej. Kryterium to MAE. Zbiór egzaminacyjny nie jest tu używany.
 """
 import itertools
 
@@ -38,7 +38,7 @@ def best_weights(oof: pd.DataFrame, models=MODELS, step: float = STEP) -> dict:
 
 
 def with_ensembles(preds: pd.DataFrame) -> pd.DataFrame:
-    """Dodaj do prognoz składników dwie kolumny: zwykłą i ważoną średnią (wagi z config.py)."""
+    """Dopisz do prognoz składników zwykłą i ważoną średnią (wagi z config.py)."""
     return preds.assign(
         **{
             ENSEMBLE_SIMPLE: preds[cfg.MODELS].mean(axis=1),
@@ -54,7 +54,7 @@ def combine(preds: pd.DataFrame, weights: dict) -> pd.Series:
 
 
 def leave_one_fold_out(oof: pd.DataFrame, models=MODELS) -> pd.DataFrame:
-    """Uczciwsza ocena wag: dla każdego foldu wagi z pozostałych foldów, MAE na tym foldzie.
+    """Ocena wag bez dopasowania do tego samego foldu: wagi z pozostałych foldów, MAE na bieżącym.
 
     Kolumny: ważona (wagi z pozostałych foldów), zwykła średnia i każdy model osobno; wiersz = fold.
     """

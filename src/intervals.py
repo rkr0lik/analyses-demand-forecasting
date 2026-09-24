@@ -1,8 +1,8 @@
 """Pasmo niepewności prognozy: empiryczne kwantyle błędów z walidacji kroczącej (tylko trening).
 
-Błąd = rzeczywistość − prognoza. Pasmo 80% to [prognoza + kwantyl 10%, prognoza + kwantyl 90%] błędów
-z prognoz out-of-fold. Jedno pasmo o stałej szerokości na model (błędów jest 168, za mało na osobne pasma
-dla każdego dnia horyzontu). Zbiór egzaminacyjny służy tylko do podania pokrycia, nie do strojenia.
+Błąd = rzeczywistość - prognoza. Pasmo 80% to [prognoza + kwantyl 10%, prognoza + kwantyl 90%] błędów
+z prognoz out-of-fold. Każdy model ma jedno pasmo o stałej szerokości, bo 168 błędów to za mało na osobne
+pasma dla każdego dnia horyzontu. Na zbiorze egzaminacyjnym tylko mierzymy pokrycie, niczego nie stroimy.
 """
 import numpy as np
 import pandas as pd
@@ -14,7 +14,7 @@ LEVEL = 0.80
 
 
 def error_quantiles(oof: pd.DataFrame, models: list[str], level: float = LEVEL) -> pd.DataFrame:
-    """Dolny i górny przesuw pasma (w szt.) dla każdego modelu: kwantyle błędu (rzeczywistość − prognoza)."""
+    """Dolne i górne przesunięcie pasma w sztukach dla każdego modelu (kwantyle błędu)."""
     assert oof.index.max() <= cfg.TRAIN_END, "pasmo może korzystać tylko z błędów z okresu treningowego"
     lo, hi = (1 - level) / 2, 1 - (1 - level) / 2
     rows = {}
@@ -42,7 +42,7 @@ def bands(forecasts: pd.DataFrame, quantiles: pd.DataFrame) -> pd.DataFrame:
 
 
 def coverage_table(y_true: pd.Series, band_table: pd.DataFrame) -> pd.DataFrame:
-    """Jaka część dni mieści się w paśmie oraz średnia szerokość pasma (szt.) dla każdego modelu."""
+    """Dla każdego modelu: jaka część dni mieści się w paśmie i jaka jest jego średnia szerokość w sztukach."""
     rows = {}
     for model, part in band_table.groupby("model", sort=False):
         actual = y_true.loc[part["date"]].to_numpy()

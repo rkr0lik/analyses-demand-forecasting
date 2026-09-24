@@ -1,4 +1,4 @@
-# Motyw w stylu raportu Power BI: jasne szare tło strony, białe karty, niebieski akcent.
+# Front
 [theme]
 base = "light"
 primaryColor = "#118DFF"

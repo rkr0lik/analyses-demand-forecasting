@@ -33,7 +33,7 @@ class TopProductsTest(unittest.TestCase):
     def test_selection_ignores_exam_sales(self):
         altered = self.raw.copy()
         in_exam = altered[cfg.COL_DATE] >= cfg.TEST_START
-        altered.loc[in_exam & (altered[cfg.COL_PRODUCT] == "P0001"), cfg.COL_TARGET] *= 1000  # P0001 "wybije się" na egzaminie
+        altered.loc[in_exam & (altered[cfg.COL_PRODUCT] == "P0001"), cfg.COL_TARGET] *= 1000  # na egzaminie P0001 nagle sprzedaje najwięcej
         self.assertEqual(top_products(altered), top_products(self.raw))
 
     def test_product_sales_add_up_to_daily_total(self):
@@ -112,7 +112,7 @@ class ProductComparisonTest(unittest.TestCase):
 
 @unittest.skipUnless(HAVE_DATA, "brak pliku z danymi (demand_forecasting.csv)")
 class RankingComparisonTest(unittest.TestCase):
-    """Wybór trójki produktów zależy od okresu i README musi to pokazywać."""
+    """Wybór trójki zależy od okresu, z którego liczymy, i README ma to pokazywać."""
 
     @classmethod
     def setUpClass(cls):
@@ -125,13 +125,13 @@ class RankingComparisonTest(unittest.TestCase):
         self.assertEqual(best, top_products(load_raw())[0], "pierwszy produkt rankingu musi zgadzać się z wyborem")
 
     def test_choice_differs_between_periods(self):
-        """Sedno wyjaśnienia w README: z treningu i z całości wychodzą różne trójki."""
+        """README ma mówić, że z treningu i z całości danych wychodzą różne trójki."""
         from_train = self.ranking.nsmallest(3, "pozycja (trening)").index.tolist()
         from_whole = self.ranking.nsmallest(3, "pozycja (całość)").index.tolist()
         self.assertNotEqual(set(from_train), set(from_whole))
 
     def test_the_contested_places_are_almost_a_tie(self):
-        """Różnice na spornych miejscach są rzędu pojedynczych sztuk dziennie."""
+        """Na spornych miejscach różnice to pojedyncze sztuki dziennie."""
         contested = self.ranking[self.ranking["pozycja (trening)"].between(2, 4)]["średnia z treningu"]
         self.assertLess(contested.max() - contested.min(), 5.0)
 

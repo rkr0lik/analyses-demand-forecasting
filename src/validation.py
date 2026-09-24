@@ -1,8 +1,8 @@
 """Walidacja krocząca (walk-forward): "próbne egzaminy" na końcu okresu treningowego.
 
-Okna testowe to kolejne bloki po `horizon` dni, ułożone tak, że ostatni kończy się w TRAIN_END.
-Model w każdym foldzie uczy się tylko na danych sprzed okna testowego (okno rozszerzające się).
-Zbiór egzaminacyjny (po TRAIN_END) nie bierze w tym udziału.
+Okna testowe to kolejne bloki po `horizon` dni. Ostatni kończy się w TRAIN_END. W każdym foldzie model
+uczy się na wszystkich danych sprzed okna testowego, więc okno uczenia rośnie z foldu na fold.
+Dni po TRAIN_END (zbiór egzaminacyjny) nie są tu używane.
 """
 from typing import NamedTuple
 
@@ -19,7 +19,7 @@ class Fold(NamedTuple):
 def walk_forward_folds(
     index: pd.DatetimeIndex, horizon: int = cfg.HORIZON, n_folds: int = cfg.CV_FOLDS
 ) -> list[Fold]:
-    """Podziały walk-forward na osi dat treningu; od najstarszego do najnowszego folda."""
+    """Podziały walk-forward na datach treningu, od najstarszego foldu do najnowszego."""
     assert index.max() <= cfg.TRAIN_END, "walidacja może używać tylko dat do końca treningu"
     first_test_start = len(index) - n_folds * horizon
     assert first_test_start >= cfg.CV_MIN_TRAIN_DAYS, "za mało danych na tyle foldów"

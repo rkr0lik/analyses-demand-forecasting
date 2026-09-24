@@ -1,8 +1,9 @@
-"""Tabele i podsumowania w dokumentach generowane z plików w outputs/ (żadnych liczb przepisywanych ręcznie).
+"""Generuje tabele i podsumowania w dokumentach z plików w outputs/, żeby nie przepisywać liczb ręcznie.
 
-Obsługiwane dokumenty: README.md, NAUKA.md i DOKUMENTACJA.md. Bloki wyglądają w nich tak:
-<!-- BEGIN:nazwa --> ... <!-- END:nazwa -->  i są podmieniane przez ten skrypt.
-Użycie: python -m src.docs_tables   (aktualizuje wszystkie trzy pliki; testy pilnują, żeby były aktualne)
+Skrypt podmienia bloki <!-- BEGIN:nazwa --> ... <!-- END:nazwa --> w README.md, NAUKA.md
+i DOKUMENTACJA.md. Pliki, których nie ma, pomija. Testy sprawdzają, czy bloki są aktualne.
+
+Użycie: python -m src.docs_tables
 """
 import re
 
@@ -23,7 +24,7 @@ SINGLE_MODELS = ["ARIMAX", "SARIMAX", "Ridge", "LightGBM"]  # pojedyncze modele 
 
 
 def num(value: float, decimals: int = 1, signed: bool = False) -> str:
-    """Liczba po polsku: przecinek dziesiętny, twarda spacja jako separator tysięcy, typograficzny minus."""
+    """Liczba w polskim zapisie: przecinek dziesiętny, twarda spacja między tysiącami i znak minus zamiast łącznika."""
     text = f"{value:{'+' if signed else ''},.{decimals}f}"
     return text.replace(",", NBSP).replace(".", ",").replace("-", "−")
 
@@ -33,7 +34,7 @@ def pct(value: float, decimals: int = 1) -> str:
 
 
 def table(headers: list[str], rows: list[list[str]], text_columns: int = 1, aligns: str | None = None) -> str:
-    """Tabela Markdown; pierwsze `text_columns` kolumn wyrównane do lewej, reszta do prawej (albo `aligns`, np. "lrrl")."""
+    """Tabela Markdown. Pierwsze `text_columns` kolumn do lewej, reszta do prawej; `aligns` (np. "lrrl") nadpisuje to ustawienie."""
     if aligns is None:
         aligns = "l" * text_columns + "r" * (len(headers) - text_columns)
     align = ["---" if a == "l" else "---:" for a in aligns]
@@ -153,9 +154,7 @@ def block_scenarios() -> str:
 
 
 
-# ---------------------------------------------------------------------------------------------------------------------
-# Bloki dla NAUKA.md (opis dla laika): te same wyniki, ale w prostszej formie
-# ---------------------------------------------------------------------------------------------------------------------
+# Bloki dla NAUKA.md: te same wyniki opisane prościej, dla osoby spoza branży.
 PLAIN_NAMES = {
     "naive": "naive (jak wczoraj)",
     "seasonal naive": "seasonal naive (jak tydzień temu)",
@@ -265,9 +264,7 @@ def block_nauka_plan() -> str:
             f"{pct(c.loc['Ridge', 'MAPE'])}, a ARIMAX o {pct(c.loc['ARIMAX', 'MAPE'])}: ten sam rząd wielkości, ale inna liczba.")
 
 
-# ---------------------------------------------------------------------------------------------------------------------
-# Bloki dla DOKUMENTACJA.md: wyniki kontroli poprawności z outputs/ (tworzy je `python -m src.audit`)
-# ---------------------------------------------------------------------------------------------------------------------
+# Bloki dla DOKUMENTACJA.md: wyniki kontroli poprawności (pliki audit_*.csv z `python -m src.audit`).
 def block_audyt_metryki() -> str:
     biggest = _read("audit_metrics.csv")["największa różnica metryk"].iloc[0]
     return (f"Metryki wszystkich modeli przeliczono od nowa z zapisanych prognoz, osobną implementacją. "
@@ -302,7 +299,7 @@ def block_cykl_roczny() -> str:
 
 
 def block_wybor_produktow() -> str:
-    """Ranking produktów z treningu i z całości danych: pokazuje, że wybór trójki zależy od okresu."""
+    """Ranking produktów z treningu i z całości danych. Z każdego okresu wychodzi inna trójka."""
     r = _read("top_products_ranking.csv", index_col="produkt")
     rows = [[name, num(r.loc[name, "średnia z treningu"]), str(int(r.loc[name, "pozycja (trening)"])),
              num(r.loc[name, "średnia z całości"]), str(int(r.loc[name, "pozycja (całość)"]))] for name in r.index]
@@ -316,7 +313,7 @@ def block_audyt_istotnosc() -> str:
 
 
 def block_przyklad() -> str:
-    """Przykład liczbowy dla miar błędu, policzony tą samą funkcją co wyniki projektu."""
+    """Przykład liczbowy miar błędu, policzony tą samą funkcją co wyniki."""
     y_true, y_pred = [100.0, 200.0], [110.0, 180.0]
     m = compute_metrics(y_true, y_pred)
     return (
@@ -376,7 +373,7 @@ MARKER = re.compile(r"<!-- BEGIN:(\w+) -->")
 
 
 def render(text: str, blocks: dict | None = None) -> str:
-    """Wypełnij w tekście wszystkie bloki generowane. Nazwa bez generatora to błąd."""
+    """Wypełnij wszystkie generowane bloki w tekście. Blok o nieznanej nazwie to błąd."""
     blocks = ALL_BLOCKS if blocks is None else blocks
     for name in MARKER.findall(text):
         if name not in blocks:
