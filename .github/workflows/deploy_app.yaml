@@ -1,0 +1,96 @@
+# Wdrożenie aplikacji Streamlit na serwer (Mikrus) przez SSH.
+
+name: deploy app
+
+# Tylko ręcznie: Actions → deploy app → Run workflow
+on:
+  workflow_dispatch:
+
+
+concurrency:
+  group: deploy-app
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: forecast-app
+  CONTAINER: forecast-app
+  APP_PORT: "80" # sam numer portu na serwerze (bez ":8501"); ten sam trzeba wskazać przy subdomenie w panelu Mikrusa
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Budowa obrazu
+        run: docker build -t "$IMAGE:${GITHUB_SHA::7}" -t "$IMAGE:latest" .
+
+      - name: Konfiguracja SSH
+        env:
+          DEPLOY_SSH: ${{ secrets.DEPLOY_SSH }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          cat > ~/.ssh/config <<EOF
+          Host deploy
+            HostName $DEPLOY_HOST
+            Port $DEPLOY_PORT
+            User $DEPLOY_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            ServerAliveInterval 30
+          EOF
+          ssh deploy 'docker version --format "Docker na serwerze: {{.Server.Version}}"'
+
+      - name: Przesłanie obrazu na serwer
+        run: docker save "$IMAGE:${GITHUB_SHA::7}" "$IMAGE:latest" | gzip -1 | ssh deploy 'gunzip | docker load'
+
+      - name: Uruchomienie kontenera
+        run: |
+          ssh deploy "IMAGE=$IMAGE TAG=${GITHUB_SHA::7} CONTAINER=$CONTAINER APP_PORT=$APP_PORT bash -s" <<'EOF'
+          set -euo pipefail
+          docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+          # Zabezpieczenia: system plików tylko do odczytu, bez uprawnień jądra, bez eskalacji uprawnień.
+          docker run -d \
+            --name "$CONTAINER" \
+            --restart unless-stopped \
+            -p "$APP_PORT:8501" \
+            --read-only \
+            --tmpfs /tmp:mode=1777 \
+            --tmpfs /home/appuser:uid=10001,gid=10001,mode=0700 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            "$IMAGE:latest"
+
+          # Czekamy na HEALTHCHECK z Dockerfile (maks. ok. 2 min).
+          for _ in $(seq 1 40); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' "$CONTAINER")
+            [ "$status" = healthy ] && break
+            [ "$status" = unhealthy ] && break
+            sleep 3
+          done
+          echo "Stan kontenera: $status"
+          if [ "$status" != healthy ]; then
+            docker logs --tail 50 "$CONTAINER"
+            exit 1
+          fi
+
+          # Usuwamy stare wersje obrazu, żeby nie zapchać dysku (zostaje bieżąca).
+          docker images "$IMAGE" --format '{{.Repository}}:{{.Tag}}' \
+            | grep -v -e ":latest$" -e ":$TAG$" \
+            | xargs -r docker rmi >/dev/null 2>&1 || true
+          docker image prune -f >/dev/null
+          EOF
+
+      - name: Sprzątanie klucza
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

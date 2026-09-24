@@ -174,7 +174,7 @@ Błąd w walidacji kroczącej (na treningu) i na egzaminie:
 
 ## Bonus: prognozy dla trzech najlepiej sprzedających się produktów
 
-Wybrane produkty (najwyższa średnia dzienna sprzedaż **w okresie treningowym**): Wybrane produkty (najwyższa średnia dzienna sprzedaż **w okresie treningowym**): <!-- BEGIN:bonus_products -->
+Wybrane produkty (najwyższa średnia dzienna sprzedaż **w okresie treningowym**): <!-- BEGIN:bonus_products -->
 **P0007**, **P0013**, **P0004**
 <!-- END:bonus_products -->
 
@@ -330,8 +330,23 @@ docker build -t forecast-app .
 docker run --rm -p 127.0.0.1:8501:8501 forecast-app     # http://localhost:8501
 ```
 
-Wdrożenie na własnym serwerze (`docker-compose.yml` z reverse proxy Caddy i HTTPS) opisuje [DEPLOY.md](DEPLOY.md).
-Proxy jest opcjonalne: sama aplikacja działa na porcie 8501.
+### Wdrożenie na serwer (GitHub Actions)
+
+Workflow `.github/workflows/deploy_app.yaml` uruchamia się **tylko ręcznie** (zakładka *Actions* → *deploy app* →
+*Run workflow*). Buduje obraz na runnerze GitHuba, przesyła go na serwer przez SSH (`docker save | docker load`)
+i podmienia kontener `forecast-app` na porcie 8501. Kontener ma system plików tylko do odczytu, nie ma uprawnień jądra
+(`cap-drop ALL`) i sam wstaje po restarcie serwera. Wdrożenie kończy się błędem, jeśli healthcheck z `Dockerfile` nie
+potwierdzi, że aplikacja działa.
+
+HTTPS i reverse proxy zapewnia subdomena z panelu Mikrusa, która przekazuje ruch na port 8501, więc na serwerze działa
+jeden kontener, bez Caddy ani nginx.
+
+Wymagania:
+
+- sekrety repozytorium (*Settings* → *Secrets and variables* → *Actions*): `DEPLOY_SSH` (klucz prywatny SSH),
+  `DEPLOY_HOST` (adres serwera), `DEPLOY_PORT` (port SSH), `DEPLOY_USER` (użytkownik SSH),
+- na serwerze: zainstalowany Docker, klucz publiczny w `~/.ssh/authorized_keys` użytkownika `DEPLOY_USER`,
+- w panelu Mikrusa: subdomena skierowana na port 8501 (inny port: zmienna `APP_PORT` w workflow).
 
 ## Struktura repozytorium
 
@@ -344,8 +359,8 @@ Proxy jest opcjonalne: sama aplikacja działa na porcie 8501.
 ├── tests/               testy (unittest)
 ├── .streamlit/          motyw aplikacji (config.toml)
 ├── requirements.txt     zależności całego projektu; requirements-app.txt: tylko aplikacja (obraz Dockera)
-├── Dockerfile, docker-compose.yml, deploy/Caddyfile, .env.example, DEPLOY.md   wdrożenie
-└── NAUKA.md, DOKUMENTACJA.md   opis projektu prostym językiem
+├── Dockerfile           obraz aplikacji (tylko requirements-app.txt i gotowe wyniki)
+└── .github/workflows/   deploy_app.yaml: ręczne wdrożenie na serwer przez SSH
 ```
 
 ## Dziennik eksperymentów
