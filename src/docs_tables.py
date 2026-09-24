@@ -62,20 +62,24 @@ def block_summary() -> str:
     models = c.loc[MODEL_ROWS]
     lo, hi = models["MAE"].min(), models["MAE"].max()
     bias_lo, bias_hi = models["Bias"].min(), models["Bias"].max()
-    direction = "wszystkie sześć modeli zawyża prognozę" if (models["Bias"] > 0).all() else "bias sześciu modeli ma różne znaki"
-    gain = lambda m: pct((1 - c.loc[m, "MAE"] / base_mae) * 100)  # noqa: E731
+    direction = "Wszystkie modele **zawyżają** prognozę" if (models["Bias"] > 0).all() else "Modele mylą się w różne strony"
+    exam_mean = _daily().loc[cfg.TEST_START : cfg.TEST_END, "units_sold"].mean()
     return "\n".join(
         [
-            f"- Najlepszy baseline: **{best_base}** (MAE {num(base_mae)}, MAPE {pct(c.loc[best_base, 'MAPE'])}).",
-            f"- **Eksperyment 1, ARIMAX:** MAE {num(c.loc['ARIMAX', 'MAE'])}, MAPE {pct(c.loc['ARIMAX', 'MAPE'])}, czyli błąd o "
-            f"{gain('ARIMAX')} mniejszy niż najlepszego baseline'u. Wariant sezonowy SARIMAX: MAE {num(c.loc['SARIMAX', 'MAE'])}.",
-            f"- **Eksperyment 2, ensemble:** zwykła średnia MAE {num(c.loc['Ensemble zwykła średnia', 'MAE'])}, ważona MAE "
-            f"{num(c.loc['Ensemble ważona średnia', 'MAE'])}. Najlepszy pojedynczy model: **{best_single}** "
-            f"(MAE {num(c.loc[best_single, 'MAE'])}, MAPE {pct(c.loc[best_single, 'MAPE'])}).",
-            f"- Sześć modeli mieści się w MAE od {num(lo)} do {num(hi)} (różnica {pct((hi / lo - 1) * 100)}), "
-            f"czyli błąd jest o {pct((1 - hi / base_mae) * 100)}–{pct((1 - lo / base_mae) * 100)} mniejszy niż najlepszego baseline'u.",
-            f"- Bias (plus = zawyża) sześciu modeli: od {num(bias_lo, signed=True)} do {num(bias_hi, signed=True)} szt. dziennie; {direction}.",
-            f"- MAPE Ridge (regresja z hamulcem) to {pct(c.loc['Ridge', 'MAPE'])}, a ARIMAX {pct(c.loc['ARIMAX', 'MAPE'])}.",
+            f"- W dniach egzaminu sieć sprzedawała średnio **{num(exam_mean, 0)} szt. dziennie**. Na tym tle trzeba czytać błędy poniżej.",
+            f"- Najlepsza z prostych metod ({PLAIN_NAMES[best_base]}) myli się średnio o **{num(base_mae, 0)} szt. dziennie** "
+            f"({pct(c.loc[best_base, 'MAPE'])}).",
+            f"- Nasze modele mylą się średnio o **{num(lo, 0)}–{num(hi, 0)} szt. dziennie** ({pct(models['MAPE'].min())}–"
+            f"{pct(models['MAPE'].max())}), czyli o {pct((1 - hi / base_mae) * 100, 0)}–{pct((1 - lo / base_mae) * 100, 0)} mniej "
+            "niż najlepsza prosta metoda.",
+            f"- **Eksperyment 1 (ARIMAX):** {num(c.loc['ARIMAX', 'MAE'], 0)} szt. dziennie ({pct(c.loc['ARIMAX', 'MAPE'])}). "
+            f"Wersja z rytmem tygodniowym (SARIMAX): {num(c.loc['SARIMAX', 'MAE'], 0)} szt.",
+            f"- **Eksperyment 2 (połączenie modeli):** zwykła średnia {num(c.loc['Ensemble zwykła średnia', 'MAE'], 0)} szt., "
+            f"średnia ważona {num(c.loc['Ensemble ważona średnia', 'MAE'], 0)} szt. Najlepszy okazał się jednak pojedynczy model "
+            f"**{best_single}** ({num(c.loc[best_single, 'MAE'], 0)} szt., {pct(c.loc[best_single, 'MAPE'])}).",
+            f"- Najlepszy i najsłabszy model dzieli tylko {pct((hi / lo - 1) * 100, 0)}, więc jeden egzamin nie wystarcza, "
+            "żeby uczciwie wskazać zwycięzcę.",
+            f"- {direction} na styczeń 2024: średnio o {num(bias_lo, 0)}–{num(bias_hi, 0)} szt. dziennie za dużo.",
         ]
     )
 
@@ -111,14 +115,19 @@ def block_models() -> str:
     w = cfg.ENSEMBLE_WEIGHTS
     return "\n".join(
         [
-            f"- **ARIMAX:** rząd (p,d,q) = {cfg.ARIMAX_ORDER}, bez sezonowości, ze zmiennymi zewnętrznymi.",
-            f"- **SARIMAX (wariant porównawczy):** rząd {cfg.SARIMAX_ORDER} z sezonowością {cfg.SARIMAX_SEASONAL_ORDER}.",
-            f"- **Ridge:** `alpha` = {cfg.RIDGE_ALPHA} na standaryzowanych zmiennych zewnętrznych "
-            f"plus cykl roczny ({cfg.RIDGE_YEAR_WAVES} pary fal sin/cos dnia roku).",
-            f"- **LightGBM (globalny):** `num_leaves` = {lgbm['num_leaves']}, `n_estimators` = {lgbm['n_estimators']}, "
-            f"`min_child_samples` = {lgbm['min_child_samples']}, `learning_rate` = 0,05, `random_state` = {cfg.RANDOM_STATE}.",
-            f"- **Ensemble:** zwykła średnia (po 1/3) oraz średnia ważona z wagami ARIMAX {num(w['ARIMAX'], 2)}, "
-            f"LightGBM {num(w['LightGBM'], 2)}, Ridge {num(w['Ridge'], 2)}.",
+            f"- **ARIMAX:** ustawienie (p, d, q) = {cfg.ARIMAX_ORDER}. W praktyce model przewiduje zmianę sprzedaży względem "
+            "poprzedniego dnia, poprawia się o swoją wczorajszą pomyłkę i dodaje wpływ epidemii, promocji i pogody. "
+            "Nie ma rytmu tygodniowego.",
+            f"- **SARIMAX (dla porównania):** to samo ustawienie {cfg.SARIMAX_ORDER} plus rytm tygodniowy "
+            f"{cfg.SARIMAX_SEASONAL_ORDER}, czyli sprzedaż zależy też od tego samego dnia tydzień wcześniej.",
+            f"- **Ridge:** siła „hamulca” `alpha` = {cfg.RIDGE_ALPHA}. Czynniki są sprowadzone do wspólnej skali. Do tego "
+            f"dochodzi cykl roczny, czyli gładka krzywa powtarzająca się co rok ({cfg.RIDGE_YEAR_WAVES} pary fal sin/cos).",
+            f"- **LightGBM:** {lgbm['n_estimators']} drzew decyzyjnych (`n_estimators`), każde z najwyżej {lgbm['num_leaves']} "
+            f"końcowymi odpowiedziami (`num_leaves`), a każda odpowiedź opiera się na co najmniej {lgbm['min_child_samples']} "
+            f"przykładach (`min_child_samples`). Tempo uczenia 0,05 (`learning_rate`). Stałe ziarno losowości "
+            f"(`random_state` = {cfg.RANDOM_STATE}) sprawia, że każde uruchomienie daje ten sam wynik.",
+            f"- **Połączenie modeli (ensemble):** zwykła średnia (każdy model po 1/3) oraz średnia ważona: "
+            f"Ridge {num(w['Ridge'], 2)}, ARIMAX {num(w['ARIMAX'], 2)}, LightGBM {num(w['LightGBM'], 2)}.",
         ]
     )
 

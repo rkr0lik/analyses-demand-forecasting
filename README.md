@@ -1,24 +1,82 @@
 # Prognoza dziennej sprzedaży na 28 dni
 
-Projekt prognozuje **łączną dzienną sprzedaż** (`Units Sold`) sumowaną po 5 sklepach i 20 produktach na 28 dni do przodu.
-Dane obejmują okres 1.01.2022 – 30.01.2024. Modele uczą się na danych do 2.01.2024, a ostatnie 28 dni (3–30.01.2024)
-służą wyłącznie jako zbiór egzaminacyjny.
+## O co chodzi
 
-Porównujemy trzy proste prognozy odniesienia (naive, seasonal naive, średnia z 28 dni) z dwoma eksperymentami:
+Sieć ma 5 sklepów i 20 produktów. Chcemy przewidzieć, ile sztuk sprzeda **łącznie każdego dnia** (kolumna `Units Sold`)
+przez następne 4 tygodnie, czyli 28 dni.
 
-1. **ARIMAX** (regresja na zmiennych zewnętrznych z „pamięcią” błędów) oraz jego wariant sezonowy SARIMAX,
-2. **ensemble** trzech różnych modeli: ARIMAX, globalny **LightGBM** (uczony na 100 seriach sklep × produkt) i **Ridge**,
-   w dwóch wariantach (zwykła i ważona średnia).
+Dane obejmują okres od 1.01.2022 do 30.01.2024. Wszystko do 2.01.2024 to materiał, na którym modele się uczą
+(**trening**). Ostatnie 28 dni (3–30.01.2024) odkładamy na bok i używamy dopiero na sam koniec, jak **egzaminu**: modele
+przewidują te dni, a my porównujemy prognozę z tym, co naprawdę się sprzedało.
 
-Bonus: osobne prognozy dla trzech najlepiej sprzedających się produktów. Całość ma aplikację webową (Streamlit).
+Co ze sobą porównujemy:
 
-> Wszystkie wyniki na zbiorze egzaminacyjnym dotyczą wariantu ***oracle***: modele znają z góry prawdziwe wartości
-> zmiennych zewnętrznych (epidemia, promocje, pogoda) dla dni prognozy.
+- **Proste metody odniesienia** (w kodzie: *baseline'y*). To nie są modele, tylko zdroworozsądkowe zgadywanie:
+  - *naive*: „będzie tak jak ostatniego dnia”,
+  - *seasonal naive*: „będzie tak jak w ten sam dzień tygodnia tydzień wcześniej”,
+  - *średnia 28 dni*: „będzie tyle, ile średnio w ostatnich 4 tygodniach”.
+
+  Jeśli model nie jest od nich wyraźnie lepszy, nie warto go używać.
+- **Eksperyment 1: ARIMAX.** Model statystyczny, który łączy dwie rzeczy: wpływ czynników z zewnątrz (epidemia, promocje,
+  pogoda) i to, że dzisiejsza sprzedaż zwykle przypomina wczorajszą. SARIMAX to ten sam model z dodanym rytmem tygodniowym.
+- **Eksperyment 2: połączenie modeli** (*ensemble*). Uśredniamy prognozy trzech różnych modeli w nadziei, że ich błędy
+  częściowo się zniosą:
+  - **ARIMAX** (jak wyżej),
+  - **Ridge**: zwykła regresja liniowa („każdy czynnik dodaje albo odejmuje określoną liczbę sztuk”) z „hamulcem”, który nie
+    pozwala jej za bardzo dopasować się do przypadkowych wahań w danych,
+  - **LightGBM**: model uczenia maszynowego zbudowany z wielu drzew decyzyjnych, czyli ciągów prostych pytań w rodzaju „czy
+    jest promocja?”, „czy pada?”. Prognozuje każdą parę sklep × produkt (100 osobnych serii), a wyniki sumujemy.
+
+  Połączenie liczymy na dwa sposoby: jako zwykłą średnią i jako średnią ważoną, w której lepszy model ma więcej do powiedzenia.
+
+Dodatkowo robimy osobne prognozy dla trzech najlepiej sprzedających się produktów. Wyniki można obejrzeć w aplikacji
+webowej (Streamlit).
+
+> **Ważne zastrzeżenie.** Na egzaminie modele dostają **prawdziwe** informacje o epidemii, promocjach i pogodzie w dniach,
+> które prognozują. To tak, jakby znać z góry bezbłędną prognozę pogody na miesiąc. Wyniki pokazują więc, jak dobre mogą być
+> modele w najlepszym razie, a w praktyce błąd byłby większy. W projekcie nazywamy to wariantem ***oracle*** („wyrocznia”).
+
+## Najważniejsze wyniki
+
+<!-- BEGIN:summary -->
+- W dniach egzaminu sieć sprzedawała średnio **8 492 szt. dziennie**. Na tym tle trzeba czytać błędy poniżej.
+- Najlepsza z prostych metod (średnia z ostatnich 28 dni) myli się średnio o **1 054 szt. dziennie** (14,4%).
+- Nasze modele mylą się średnio o **374–409 szt. dziennie** (4,7%–5,1%), czyli o 61%–64% mniej niż najlepsza prosta metoda.
+- **Eksperyment 1 (ARIMAX):** 406 szt. dziennie (5,1%). Wersja z rytmem tygodniowym (SARIMAX): 409 szt.
+- **Eksperyment 2 (połączenie modeli):** zwykła średnia 390 szt., średnia ważona 383 szt. Najlepszy okazał się jednak pojedynczy model **Ridge** (374 szt., 4,7%).
+- Najlepszy i najsłabszy model dzieli tylko 9%, więc jeden egzamin nie wystarcza, żeby uczciwie wskazać zwycięzcę.
+- Wszystkie modele **zawyżają** prognozę na styczeń 2024: średnio o 221–301 szt. dziennie za dużo.
+<!-- END:summary -->
+
+Szczegóły w części [Wyniki na egzaminie](#wyniki-na-egzaminie).
+
+## Słowniczek
+
+Jak mierzymy błąd prognozy (wszystkie miary liczy jedna wspólna funkcja w `src/metrics.py`):
+
+| Miara | Co znaczy | Lepiej, gdy |
+|---|---|---|
+| **MAE** | o ile sztuk prognoza myli się przeciętnie w ciągu dnia, bez względu na to, czy w górę, czy w dół. Główna miara w projekcie | mniej |
+| **RMSE** | podobnie jak MAE, ale mocniej karze duże pomyłki: jeden dzień z pomyłką o 1000 szt. waży więcej niż dziesięć dni po 100 szt. | mniej |
+| **MAPE** | przeciętna pomyłka w procentach rzeczywistej sprzedaży | mniej |
+| **Bias** | czy model systematycznie przesadza w jedną stronę. Plus: prognozy są średnio za wysokie, minus: za niskie | bliżej zera |
+
+Inne pojęcia, które pojawiają się niżej:
+
+- **Walidacja krocząca** (*walk-forward*): próbne egzaminy na danych treningowych. Model uczy się na danych do pewnego dnia,
+  prognozuje kolejne 28 dni, potem okno przesuwa się o 28 dni dalej i wszystko się powtarza. Na tej podstawie wybieramy
+  ustawienia modeli, żeby nie zaglądać do prawdziwego egzaminu.
+- **Wyciek danych**: sytuacja, w której model przypadkiem dostaje informację, jakiej w chwili prognozowania by nie miał
+  (np. przyszłą sprzedaż). Wyniki wyglądają wtedy świetnie, ale są oszukane.
+- **R²**: jaką część wahań sprzedaży da się wytłumaczyć danym czynnikiem. 0 oznacza nic, 1 oznacza wszystko.
+- **Korelacja**: jak mocno dwie wielkości zmieniają się razem. Wartość bliska 1 lub −1 oznacza, że to praktycznie ta sama
+  informacja.
+- **Pasmo niepewności 80%**: przedział wokół prognozy, w którym rzeczywista sprzedaż powinna się znaleźć w 8 dniach na 10.
 
 ## Wymagania i instalacja
 
-Projekt był uruchamiany na Pythonie 3.12. Zależności z wersjami są w `requirements.txt` (pandas, numpy, scikit-learn,
-statsmodels, lightgbm, streamlit, plotly, matplotlib).
+Projekt działa na Pythonie 3.12. Biblioteki z wersjami są w `requirements.txt` (pandas, numpy, scikit-learn, statsmodels,
+lightgbm, streamlit, plotly, matplotlib).
 
 ```bash
 python3 -m venv .venv
@@ -26,95 +84,94 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Na Debianie i Ubuntu do `venv` może być potrzebny pakiet systemowy: `sudo apt install python3-venv`.
+Na Debianie i Ubuntu może być potrzebny dodatkowy pakiet: `sudo apt install python3-venv`.
 
 ## Dane
 
-Plik `demand_forecasting.csv` **nie jest
-częścią repozytorium**. Umieść go w katalogu głównym projektu (ścieżka jest w `config.py`). Bez niego:
-  - nie da się ponownie policzyć modeli, a testy oparte na danych są pomijane,
-  - aplikacja i testy wyników działają, bo korzystają z gotowych plików w `outputs/` (zawierają tylko agregaty i prognozy,
-    bez surowych wierszy).
+Pliku `demand_forecasting.csv` **nie ma w repozytorium**. Można go pobrać z
+[Kaggle](https://www.kaggle.com/datasets/raminhuseyn/demand-forecasting-dataset) i wrzucić do głównego katalogu projektu
+(ścieżka jest w `config.py`).
 
-    [Link do pliku csv](https://www.kaggle.com/datasets/raminhuseyn/demand-forecasting-dataset)
+Bez tego pliku:
 
+- nie da się od nowa policzyć modeli, a testy, które potrzebują danych, są pomijane,
+- aplikacja i testy wyników działają normalnie, bo korzystają z gotowych plików w `outputs/` (są tam tylko sumy
+  i prognozy, bez surowych danych).
 
-## Co wpływa na sprzedaż i które zmienne wybraliśmy
+## Co wpływa na sprzedaż
 
-Liczby poniżej policzył `python -m src.explore` wyłącznie na **danych treningowych** (732 dni, do 2.01.2024).
+Zanim zbudowaliśmy modele, sprawdziliśmy, co w ogóle rusza sprzedażą. Liczby poniżej policzył `python -m src.explore`
+wyłącznie na **danych treningowych** (732 dni, do 2.01.2024).
 
-| Obserwacja | Wynik |
+| Czynnik | Co wyszło |
 |---|---|
-| **Epidemia** | średnia dzienna sprzedaż spada z 9 599 do 6 084 szt. (−36,6%). To największy pojedynczy efekt: sama flaga epidemii wyjaśnia 80,9% zmienności dziennej sprzedaży (R² = 0,809) |
-| **Promocje** | dzień, w którym wszystkie produkty są w promocji, daje ok. +2 122 szt. (współczynnik przy udziale produktów w promocji, od 0 do 1) |
-| **Pogoda** | gdyby wszystkie sklepy miały daną pogodę zamiast pochmurnej: słonecznie +774 szt., deszcz −721 szt., śnieg −1 355 szt. |
-| **Rytm tygodniowy** | średnie sprzedaże w poszczególne dni tygodnia różnią się o 1,9% (o 2,8% po wyłączeniu dni epidemii): rytmu tygodniowego nie ma. Potwierdza to SARIMAX, który z sezonowością tygodniową wypadł w walidacji nieco gorzej niż ARIMAX |
-| **Razem** | regresja liniowa na epidemii, promocjach i pogodzie ma R² = 0,906. To dopasowanie w próbie treningowej, a nie wynik prognozy |
+| **Epidemia** | w dniach epidemii sieć sprzedaje średnio 6 084 zamiast 9 599 szt. dziennie, czyli o 36,6% mniej. To zdecydowanie najważniejszy czynnik: sama informacja „czy jest epidemia” tłumaczy ok. 81% wahań dziennej sprzedaży (R² = 0,809) |
+| **Promocje** | gdyby w promocji były wszystkie produkty naraz, sprzedaż byłaby wyższa o ok. 2 122 szt. dziennie niż bez żadnej promocji. Zwykle w promocji jest tylko część produktów, więc efekt jest proporcjonalnie mniejszy |
+| **Pogoda** | w porównaniu z dniem, gdy we wszystkich sklepach jest pochmurno: słońce daje +774 szt., deszcz −721 szt., śnieg −1 355 szt. |
+| **Dzień tygodnia** | dni tygodnia prawie się nie różnią (o 1,9%, a po pominięciu epidemii o 2,8%). W tych danych nie ma czegoś takiego jak „mocna sobota”. Potwierdza to SARIMAX: z dodanym rytmem tygodniowym wypadł w próbnych egzaminach trochę gorzej niż ARIMAX bez niego |
+| **Wszystko razem** | epidemia, promocje i pogoda razem tłumaczą ok. 91% wahań sprzedaży (R² = 0,906). Uwaga: to dopasowanie do danych, które model już widział, a nie sprawdzian prognozy |
 
-### Zmienne użyte w modelach
+### Czego używają modele
 
-| Zmienna | Jak jest zapisana | Gdzie |
+| Informacja | W jakiej postaci | Które modele |
 |---|---|---|
-| Epidemia | flaga 0/1 dla dnia (w danych to jedna wartość dla wszystkich sklepów i produktów) | ARIMAX, SARIMAX, Ridge, LightGBM |
-| Promocje | udział produktów w promocji danego dnia (modele dzienne); flaga promocji wiersza (LightGBM) | ARIMAX, SARIMAX, Ridge, LightGBM |
-| Pogoda | udziały sklepów ze słońcem, deszczem i śniegiem (modele dzienne; pochmurno jest kategorią odniesienia, żeby udziały nie sumowały się do stałej); pogoda sklepu (LightGBM) | ARIMAX, SARIMAX, Ridge, LightGBM |
-| Sklep, produkt, kategoria, region | identyfikatory serii | tylko LightGBM |
-| Historia sprzedaży serii | opóźnienie co najmniej 28 dni: sprzedaż sprzed 28 dni oraz średnie z 7 i 28 dni liczone od tego dnia | tylko LightGBM |
+| Epidemia | 0 lub 1 dla każdego dnia (w danych epidemia jest ta sama dla wszystkich sklepów i produktów) | wszystkie |
+| Promocje | jaka część produktów jest danego dnia w promocji; LightGBM widzi promocję każdego produktu osobno | wszystkie |
+| Pogoda | w jakiej części sklepów jest słońce, deszcz, śnieg (pochmurno to punkt odniesienia, bo cztery udziały zawsze sumowałyby się do 1); LightGBM widzi pogodę każdego sklepu osobno | wszystkie |
+| Sklep, produkt, kategoria, region | który to sklep i produkt | tylko LightGBM |
+| Wcześniejsza sprzedaż | sprzedaż sprzed 28 dni oraz średnie z 7 i 28 dni liczone od tamtego dnia | tylko LightGBM |
 
-Baseline'y korzystają wyłącznie z historii sprzedaży z treningu. Zmienne zewnętrzne dla dni egzaminacyjnych podajemy
-modelom w prawdziwej wartości. To wariant ***oracle***: pokazuje, jak dobry może być model, **jeśli** te informacje znamy
-z góry. Promocje firma planuje z wyprzedzeniem, ale pogody i epidemii na kilka tygodni nie znamy, dlatego aplikacja ma
-osobny scenariusz długości epidemii. Cechy sprzedażowe LightGBM mają opóźnienie co najmniej 28 dni, więc nie potrzeba
-prognozy rekurencyjnej.
+Proste metody odniesienia korzystają tylko z historii sprzedaży z okresu treningowego.
+
+Dlaczego LightGBM patrzy na sprzedaż sprzed **co najmniej 28 dni**? Bo prognozujemy 28 dni do przodu. Gdyby model
+potrzebował wczorajszej sprzedaży, musiałby w dniach prognozy używać własnych wcześniejszych prognoz zamiast prawdziwych
+liczb, a błędy by się wtedy nawarstwiały.
+
+Jak wspomnieliśmy wyżej, na egzaminie modele znają prawdziwą epidemię, promocje i pogodę w prognozowanych dniach. Promocje
+firma planuje z wyprzedzeniem, więc to realistyczne. Pogody i epidemii na kilka tygodni naprzód nikt nie zna, dlatego
+w aplikacji można sprawdzić różne scenariusze długości epidemii.
 
 ### Czego nie używamy i dlaczego
 
-| Kolumna | Dlaczego odpada |
+| Kolumna | Dlaczego jej nie używamy |
 |---|---|
-| `Demand`, `Inventory Level`, `Units Ordered` | **wyciek danych**: nie znamy ich z wyprzedzeniem. Test pilnuje, że nie ma ich wśród cech |
-| `Competitor Pricing` | ceny konkurencji nie są znane z góry |
-| `Discount` (rabat) | powiela promocję (korelacja dzienna 0,97, VIF 16, w regresji nieistotny, p = 0,66); usunięty ze wszystkich modeli, patrz [Zmiany po pierwszym pomiarze](#zmiany-po-pierwszym-pomiarze-na-egzaminie) |
-| `Price` | korelacja z epidemią −0,91, a współczynnik przy sprzedaży dodatni (wyższa cena, wyższa sprzedaż). To znak, że cena podąża za popytem, więc prawdziwa cena z okresu egzaminacyjnego mogłaby ukrywać informację o sprzedaży. Modeli z ceną nie sprawdzaliśmy |
-| `Seasonality` | etykieta pory roku wynikająca wprost z miesiąca. Zamiast niej Ridge dostał płynny cykl roczny (fale sin/cos dnia roku) |
-| dzień tygodnia | rytmu tygodniowego w danych nie ma (różnice poniżej 3%), SARIMAX z sezonowością s=7 wypadł nieco gorzej niż ARIMAX |
+| `Demand`, `Inventory Level`, `Units Ordered` | to **wyciek danych**: popytu, stanu magazynu i zamówień nie znamy z wyprzedzeniem, a są mocno powiązane ze sprzedażą. Test sprawdza, że żaden model ich nie dostaje |
+| `Competitor Pricing` | cen konkurencji nie znamy z góry |
+| `Discount` (rabat) | powtarza tę samą informację co promocja (korelacja 0,97) i nic nie wnosi do modelu. Usunęliśmy go, patrz [Zmiany po pierwszym pomiarze](#zmiany-po-pierwszym-pomiarze-na-egzaminie) |
+| `Price` | cena idzie w górę razem ze sprzedażą (w epidemii spada), czyli to raczej sprzedaż wpływa na cenę niż odwrotnie. Prawdziwa cena z okresu egzaminu mogłaby więc „podpowiadać” modelowi wynik. Modeli z ceną nie sprawdzaliśmy |
+| `Seasonality` | pora roku wynika wprost z miesiąca. Zamiast niej Ridge dostał gładką krzywą roczną (fale sin/cos) |
+| dzień tygodnia | rytmu tygodniowego w danych nie ma (różnice poniżej 3%) |
 
-## Metodologia
+## Jak sprawdzaliśmy, że wynik jest uczciwy
 
-- **Trening:** 1.01.2022 – 2.01.2024 (732 dni). **Zbiór egzaminacyjny:** 3–30.01.2024 (28 dni), z czego pierwsze 6 dni
-  (3–8.01) wypada w epidemii, a pozostałe 22 nie.
-- **Parametry i wagi ensemble wybrano walidacją kroczącą (walk-forward) na treningu:** 6 kolejnych okien testowych po
-  28 dni na końcu treningu (19.07.2023 – 2.01.2024), z rozszerzającym się oknem uczenia.
-- **Baseline'y liczone uczciwie**, wyłącznie z treningu: naive to ostatni dzień treningu powtórzony 28 razy, seasonal
-  naive to ostatnie 7 dni powtórzone 4 razy, średnia to średnia z ostatnich 28 dni.
-- **Brak wycieku danych pilnują testy:** po pomnożeniu sprzedaży z okresu egzaminacyjnego (a w walidacji: z dni po foldzie)
-  przez 1000 nie zmienia się żadna cecha, żaden baseline ani żadna prognoza.
-- **Metryki:** MAE, RMSE, MAPE i bias (plus = model zawyża), z jednej wspólnej funkcji, liczone razem oraz osobno dla dni
-  z epidemią i bez.
-- **Egzamin liczono trzy razy** (wybór modeli w ciemno, cykl roczny w Ridge, usunięcie rabatu). Szczegóły w
-  [Ograniczeniach](#ograniczenia).
+- **Podział danych.** Trening: 1.01.2022 – 2.01.2024 (732 dni). Egzamin: 3–30.01.2024 (28 dni). Pierwsze 6 dni egzaminu
+  (3–8.01) przypada jeszcze na epidemię, pozostałe 22 już nie.
+- **Ustawienia modeli wybierały próbne egzaminy, a nie prawdziwy.** Zrobiliśmy 6 próbnych egzaminów po 28 dni na końcu
+  okresu treningowego (19.07.2023 – 2.01.2024). Przed każdym model uczy się na wszystkich wcześniejszych danych.
+  Tak samo dobraliśmy wagi w średniej ważonej.
+- **Proste metody widzą tylko trening.** *Naive* powtarza 28 razy ostatni dzień treningu, *seasonal naive* powtarza
+  4 razy ostatni tydzień, a *średnia* to średnia z ostatnich 28 dni treningu.
+- **Wyciek danych wyłapują testy.** Testy mnożą sprzedaż z okresu egzaminu (a w próbnych egzaminach: z dni po danym
+  oknie) przez 1000 i sprawdzają, że nie zmienia się ani żadna informacja podawana modelom, ani żadna prognoza.
+  Gdyby model „podglądał” przyszłość, test by to wychwycił.
+- **Błąd liczymy łącznie, a także osobno dla dni z epidemią i bez niej.**
+- **Egzamin liczyliśmy trzy razy.** Pierwszy raz na modelach dobranych w ciemno, potem po dwóch poprawkach. Dlaczego to
+  ważne, piszemy w [Ograniczeniach](#ograniczenia).
 
-### Modele
+### Ustawienia modeli
 
 <!-- BEGIN:models -->
-- **ARIMAX:** rząd (p,d,q) = (0, 1, 1), bez sezonowości, ze zmiennymi zewnętrznymi.
-- **SARIMAX (wariant porównawczy):** rząd (0, 1, 1) z sezonowością (1, 0, 0, 7).
-- **Ridge:** `alpha` = 30 na standaryzowanych zmiennych zewnętrznych plus cykl roczny (3 pary fal sin/cos dnia roku).
-- **LightGBM (globalny):** `num_leaves` = 15, `n_estimators` = 200, `min_child_samples` = 20, `learning_rate` = 0,05, `random_state` = 42.
-- **Ensemble:** zwykła średnia (po 1/3) oraz średnia ważona z wagami ARIMAX 0,25, LightGBM 0,10, Ridge 0,65.
+- **ARIMAX:** ustawienie (p, d, q) = (0, 1, 1). W praktyce model przewiduje zmianę sprzedaży względem poprzedniego dnia, poprawia się o swoją wczorajszą pomyłkę i dodaje wpływ epidemii, promocji i pogody. Nie ma rytmu tygodniowego.
+- **SARIMAX (dla porównania):** to samo ustawienie (0, 1, 1) plus rytm tygodniowy (1, 0, 0, 7), czyli sprzedaż zależy też od tego samego dnia tydzień wcześniej.
+- **Ridge:** siła „hamulca” `alpha` = 30. Czynniki są sprowadzone do wspólnej skali. Do tego dochodzi cykl roczny, czyli gładka krzywa powtarzająca się co rok (3 pary fal sin/cos).
+- **LightGBM:** 200 drzew decyzyjnych (`n_estimators`), każde z najwyżej 15 końcowymi odpowiedziami (`num_leaves`), a każda odpowiedź opiera się na co najmniej 20 przykładach (`min_child_samples`). Tempo uczenia 0,05 (`learning_rate`). Stałe ziarno losowości (`random_state` = 42) sprawia, że każde uruchomienie daje ten sam wynik.
+- **Połączenie modeli (ensemble):** zwykła średnia (każdy model po 1/3) oraz średnia ważona: Ridge 0,65, ARIMAX 0,25, LightGBM 0,10.
 <!-- END:models -->
 
-## Wyniki na zbiorze egzaminacyjnym (wariant oracle)
+## Wyniki na egzaminie
 
-<!-- BEGIN:summary -->
-- Najlepszy baseline: **średnia 28 dni** (MAE 1 053,5, MAPE 14,4%).
-- **Eksperyment 1, ARIMAX:** MAE 405,8, MAPE 5,1%, czyli błąd o 61,5% mniejszy niż najlepszego baseline'u. Wariant sezonowy SARIMAX: MAE 409,3.
-- **Eksperyment 2, ensemble:** zwykła średnia MAE 389,6, ważona MAE 383,5. Najlepszy pojedynczy model: **Ridge** (MAE 374,0, MAPE 4,7%).
-- Sześć modeli mieści się w MAE od 374,0 do 409,3 (różnica 9,4%), czyli błąd jest o 61,2%–64,5% mniejszy niż najlepszego baseline'u.
-- Bias (plus = zawyża) sześciu modeli: od +220,7 do +300,6 szt. dziennie; wszystkie sześć modeli zawyża prognozę.
-- MAPE Ridge (regresja z hamulcem) to 4,7%, a ARIMAX 5,1%.
-<!-- END:summary -->
-
-Wszystkie modele i oba warianty ensemble, posortowane rosnąco po MAE (szt. dziennie; pełna tabela: `outputs/comparison.csv`):
+Wszystkie modele i proste metody, od najlepszej do najsłabszej (błędy w sztukach dziennie, pełna tabela w
+`outputs/comparison.csv`):
 
 <!-- BEGIN:comparison -->
 | Model | Grupa | MAE | RMSE | MAPE | Bias |
@@ -130,7 +187,7 @@ Wszystkie modele i oba warianty ensemble, posortowane rosnąco po MAE (szt. dzie
 | seasonal naive | baseline | 2 595,4 | 2 945,9 | 28,5% | −2 539,8 |
 <!-- END:comparison -->
 
-Osobno dla dni z epidemią (6 dni) i bez epidemii (22 dni):
+Ta sama tabela z podziałem na dni z epidemią (6 dni) i bez niej (22 dni):
 
 <!-- BEGIN:epidemic -->
 | Model | MAE epidemia | MAPE epidemia | Bias epidemia | MAE bez epidemii | MAPE bez epidemii | Bias bez epidemii |
@@ -146,21 +203,23 @@ Osobno dla dni z epidemią (6 dni) i bez epidemii (22 dni):
 | seasonal naive | 466,7 | 7,5% | −207,3 | 3 175,9 | 34,2% | −3 175,9 |
 <!-- END:epidemic -->
 
-Jak to czytać:
+Co z tego wynika:
 
-- **Wszystkie modele są znacznie lepsze od baseline'ów.** Naive i seasonal naive są dobre tylko w dniach epidemii, bo
-  powtarzają poziom z ostatnich dni treningu. Po jej końcu mylą się najbardziej. Średnia z 28 dni „rozmywa” epidemię
-  i dlatego jest najlepszym baseline'em.
-- **Sześć modeli mieści się w wąskim paśmie błędu, a ich kolejność na jednym 28-dniowym egzaminie nie jest
-  rozstrzygająca.** W walidacji na treningu kolejność była inna (tabela niżej).
-- **Ensemble nie pobił najlepszego składnika (Ridge).** Ważona średnia jest lepsza od zwykłej, ale wagi dobrano na tych
-  samych foldach, na których mierzymy walidację, więc jej przewaga w walidacji jest zawyżona. Składniki robią podobne
-  błędy (korelacja błędów ARIMAX i Ridge powyżej 0,9), dlatego uśrednianie zyskuje niewiele.
-- **Modele uzupełniają się w czasie:** LightGBM jest najlepszy w dniach epidemii, Ridge poza nią.
-- **Wszystkie modele zawyżają prognozę na styczeń.** Wyjaśnia to sezonowość roczna: styczeń ma ujemny efekt
-  (−122 szt./dzień), a modele znają ją słabo (Ridge dostał cykl roczny, ale na styczniu nie pomogło).
+- **Każdy model jest dużo lepszy od prostych metod.** *Naive* i *seasonal naive* dobrze radzą sobie tylko w dniach
+  epidemii, bo powtarzają niską sprzedaż z końca treningu. Kiedy epidemia się kończy, mylą się najbardziej. Średnia
+  z 28 dni miesza dni z epidemią i bez, więc wypada najlepiej z trzech prostych metod.
+- **Modele wypadły bardzo podobnie i z jednego 28-dniowego egzaminu nie da się ustalić, który jest najlepszy.**
+  W próbnych egzaminach kolejność była inna (tabela niżej).
+- **Połączenie modeli nie pokonało najlepszego z nich (Ridge).** Średnia ważona jest lepsza od zwykłej, ale wagi dobieraliśmy
+  na tych samych próbnych egzaminach, na których potem mierzymy wynik, więc jej przewaga w próbach jest trochę
+  przesadzona. Uśrednianie pomaga, gdy modele mylą się w różny sposób. Tu mylą się bardzo podobnie (korelacja błędów
+  ARIMAX i Ridge przekracza 0,9), więc niewiele to daje.
+- **Modele sprawdzają się w różnych momentach:** LightGBM najlepiej radzi sobie w dniach epidemii, a Ridge po niej.
+- **Wszystkie modele przeszacowują styczeń.** Styczeń jest w tych danych słabszym miesiącem (ok. 122 szt. dziennie mniej,
+  niż wynikałoby z epidemii, promocji i pogody), a modele słabo to uwzględniają. Ridge dostał krzywą roczną, ale na
+  styczeń nie pomogła.
 
-Błąd w walidacji kroczącej (na treningu) i na egzaminie:
+Porównanie błędu na próbnych egzaminach i na prawdziwym (MAE, szt. dziennie):
 
 <!-- BEGIN:validation -->
 | Model | MAE w walidacji kroczącej (trening) | MAE na egzaminie |
@@ -172,15 +231,18 @@ Błąd w walidacji kroczącej (na treningu) i na egzaminie:
 | LightGBM | 385,4 | 390,7 |
 <!-- END:validation -->
 
+Na próbnych egzaminach najlepsza była średnia ważona, na prawdziwym Ridge. To kolejny znak, że różnice między modelami są
+zbyt małe, żeby wskazać zwycięzcę.
+
 ## Prognozy dla trzech najlepiej sprzedających się produktów
 
 Wybrane produkty (najwyższa średnia dzienna sprzedaż **w okresie treningowym**): <!-- BEGIN:bonus_products -->
 **P0007**, **P0013**, **P0004**
 <!-- END:bonus_products -->
 
-Treść zadania nie precyzuje okresu, z którego liczyć średnią. Wybraliśmy trening, bo egzamin nie może wpływać na żadną
-decyzję. Z całości danych trójka byłaby inna (P0007, P0004, P0009), ale miejsca 2–4 dzielą ułamki sztuki dziennie, więc to
-praktycznie remis:
+Treść zadania nie mówi, z jakiego okresu liczyć średnią. Wybraliśmy okres treningowy, bo nic z egzaminu nie może wpływać
+na nasze decyzje. Gdyby liczyć z całych danych, trójka byłaby inna (P0007, P0004, P0009), ale miejsca od 2. do 4. dzielą
+ułamki sztuki dziennie, więc to praktycznie remis:
 
 <!-- BEGIN:wybor_produktow -->
 | Produkt | Średnia dzienna (trening) | Pozycja | Średnia dzienna (całość danych) | Pozycja |
@@ -192,7 +254,8 @@ praktycznie remis:
 | P0002 | 475,8 | 5 | 472,8 | 5 |
 <!-- END:wybor_produktow -->
 
-Prognoza produktu to suma prognoz globalnego LightGBM po 5 sklepach. Baseline'y liczone są z treningu danego produktu.
+Prognoza dla produktu to suma prognoz LightGBM z 5 sklepów. Proste metody liczymy z historii danego produktu w okresie
+treningowym.
 
 <!-- BEGIN:bonus -->
 | Produkt | Model | MAE | RMSE | MAPE | Bias |
@@ -211,16 +274,19 @@ Prognoza produktu to suma prognoz globalnego LightGBM po 5 sklepach. Baseline'y 
 | P0004 | seasonal naive | 207,8 | 234,1 | 42,5% | −189,6 |
 <!-- END:bonus -->
 
-- LightGBM ma najniższy błąd dla wszystkich trzech produktów, ale przewaga jest nierówna (mała dla P0007, gdzie poza
-  epidemią lepsza jest średnia z 28 dni).
-- Błąd względny jest większy niż dla sumy, bo pojedynczy produkt jest dużo bardziej zaszumiony niż suma 100 serii.
-- Parametry LightGBM dobrano na sumie dziennej, a nie na produktach.
+- LightGBM ma najmniejszy błąd dla każdego z trzech produktów, ale przewaga jest różna. Dla P0007 jest niewielka, a po
+  epidemii średnia z 28 dni radzi sobie tam nawet lepiej.
+- Błąd w procentach jest tu dużo większy niż dla całej sieci. Sprzedaż jednego produktu mocno skacze z dnia na dzień,
+  a w sumie 100 serii te skoki w dużej części się znoszą.
+- Ustawienia LightGBM dobieraliśmy pod łączną sprzedaż, a nie pod pojedyncze produkty.
 
+## Jak bardzo można ufać prognozie
 
-## Pasmo niepewności i scenariusze epidemii
+### Pasmo niepewności
 
-**Pasmo 80%** to prognoza przesunięta o kwantyle 10% i 90% błędów z walidacji kroczącej (jedno pasmo o stałej szerokości na
-model; baseline'y i SARIMAX bez pasma):
+Wokół prognozy rysujemy **pasmo 80%**: przedział, w którym rzeczywista sprzedaż powinna się znaleźć w 8 dniach na 10.
+Szerokość pasma wzięliśmy z pomyłek na próbnych egzaminach: pomijamy 10% najbardziej zaniżonych i 10% najbardziej
+zawyżonych prognoz, a resztę wyznacza pasmo. Każdy model ma pasmo stałej szerokości (proste metody i SARIMAX go nie mają).
 
 <!-- BEGIN:coverage -->
 | Model | Pokrycie na egzaminie (deklarowane 80%) | Średnia szerokość pasma, szt. |
@@ -232,13 +298,15 @@ model; baseline'y i SARIMAX bez pasma):
 | Ensemble ważona średnia | 71% | 1 013 |
 <!-- END:coverage -->
 
-Pasmo mieści rzeczywistą sprzedaż w mniejszej części dni niż deklarowane 80%. Różnica to jeden–dwa dni z 28, więc mieści się
-w zwykłym rozrzucie tak małej próby (dni są ponadto zależne). Pasmo nie zna też biasu widocznego na egzaminie, więc leży
-nieco za wysoko. Nie stroiliśmy go pod wynik egzaminu.
+Rzeczywista sprzedaż mieściła się w paśmie trochę rzadziej niż w 80% dni. Różnica to jeden–dwa dni z 28, więc przy tak
+krótkim okresie może to być przypadek (tym bardziej że sąsiednie dni są do siebie podobne). Pasmo nie wie też, że modele
+przeszacowują styczeń, więc leży nieco za wysoko. Nie poprawialiśmy go pod wynik egzaminu.
 
-**Scenariusze epidemii** odpowiadają na pytanie „co, jeśli epidemia potrwa jeszcze N dni od 3.01.2024?”. Zmieniamy tylko flagę
-epidemii w dniach prognozy (reszta zmiennych prawdziwa), a modele są te same. Dla N = 6, czyli faktycznej długości, prognozy
-są identyczne z egzaminacyjnymi. Suma prognozy z 28 dni (szt.):
+### Co, jeśli epidemia potrwa dłużej
+
+Scenariusze odpowiadają na pytanie „co, jeśli od 3.01.2024 epidemia potrwa jeszcze N dni?”. Zmieniamy tylko informację
+o epidemii w prognozowanych dniach, a wszystko inne (w tym same modele) zostaje bez zmian. Dla N = 6, czyli tyle, ile
+epidemia trwała naprawdę, prognozy są identyczne z egzaminacyjnymi. Łączna prognozowana sprzedaż z 28 dni (szt.):
 
 <!-- BEGIN:scenarios -->
 | Model | N = 0 | N = 6 (faktycznie) | N = 28 | Zmiana sumy na każdy dzień epidemii |
@@ -250,15 +318,17 @@ są identyczne z egzaminacyjnymi. Suma prognozy z 28 dni (szt.):
 | Ridge | 264 112 | 243 961 | 170 076 | −3 358 |
 <!-- END:scenarios -->
 
-Każdy dodatkowy dzień epidemii obniża sumę o podobną wielkość we wszystkich modelach. Niepewność co do długości epidemii jest
-znacznie większa niż różnice między modelami, dlatego wynik z tabeli wyżej dotyczy sytuacji, w której długość epidemii znamy.
+Każdy dodatkowy dzień epidemii obniża łączną sprzedaż mniej więcej o tyle samo we wszystkich modelach. Niepewność co do
+tego, jak długo potrwa epidemia, jest dużo większa niż różnice między modelami. Wyniki egzaminu dotyczą więc sytuacji,
+w której długość epidemii znamy.
 
 ## Zmiany po pierwszym pomiarze na egzaminie
 
-**Cykl roczny w Ridge (druga próba).** Kontrola (`python -m src.audit`) wykazała silną sezonowość roczną, której zmienne
-zewnętrzne nie tłumaczą: średni błąd regresji treningowej waha się od −286 szt./dzień we wrześniu do +500 w sierpniu.
-Ridge dostał więc fale sin/cos dnia roku (3 pary, `alpha` = 30, wybrane walidacją kroczącą). Ostatnia kolumna to kontrolny
-styczeń rok wcześniej (uczenie do 2.01.2023, test 3–30.01.2023):
+**Krzywa roczna w Ridge (druga próba).** Kontrola (`python -m src.audit`) pokazała, że sprzedaż zmienia się w ciągu roku
+w sposób, którego epidemia, promocje i pogoda nie tłumaczą. Prosta regresja na tych czynnikach myliła się w zależności od
+miesiąca przeciętnie o 286 szt. dziennie w jedną stronę (wrzesień) do 500 szt. dziennie w drugą (sierpień). Dlatego Ridge dostał gładką krzywą powtarzającą
+się co rok (3 pary fal sin/cos, `alpha` = 30, wybrane na próbnych egzaminach). Ostatnia kolumna to dodatkowy sprawdzian na
+styczniu rok wcześniej (nauka do 2.01.2023, prognoza na 3–30.01.2023):
 
 <!-- BEGIN:cykl_roczny -->
 | Wariant | MAE w walidacji (trening) | MAE na egzaminie | MAE w kontrolnym styczniu |
@@ -267,66 +337,68 @@ styczeń rok wcześniej (uczenie do 2.01.2023, test 3–30.01.2023):
 | Ridge z cyklem rocznym (3 pary fal) | 301,7 | 374,0 | 286,7 |
 <!-- END:cykl_roczny -->
 
-W walidacji zysk jest duży (−20% MAE), ale pochodzi z miesięcy lipiec–grudzień. Na styczniu, czyli w okresie takim jak
-egzamin, cykl roczny nic nie dał. W LightGBM go nie wdrożyliśmy: w walidacji pomagał, ale w foldzie grudniowym
-i kontrolnym styczniu pogarszał wynik. Dane mają tylko dwa pełne cykle roczne, więc sezonowość jest szacowana z dwóch
-powtórzeń.
+Na próbnych egzaminach zysk jest duży (błąd mniejszy o 20%), ale bierze się z miesięcy od lipca do grudnia. Na styczniu,
+czyli w okresie takim jak egzamin, krzywa roczna nic nie dała. W LightGBM jej nie dodaliśmy: na próbnych egzaminach
+ogólnie pomagała, ale w grudniu i w kontrolnym styczniu pogarszała wynik. Dane obejmują tylko dwa pełne lata, więc
+wzór roczny jest oszacowany zaledwie z dwóch powtórzeń.
 
-**Usunięcie rabatu (trzecia próba).** Rabat jest funkcją promocji (bez promocji 0–10%, z promocją 10–25%), więc po
-agregacji do dnia obie cechy są niemal tożsame (korelacja 0,97, VIF 16,1), a współczynnik rabatu był nieistotny
-(p = 0,66) i miał nonsensowny ujemny znak. Usunęliśmy go ze wszystkich modeli i ponownie dobraliśmy parametry
-walidacją kroczącą. **Żaden wybór ustawień się nie zmienił**, zmieniły się tylko wagi ensemble (0,25 / 0,10 / 0,65
-zamiast 0,35 / 0,10 / 0,55). Wyniki na egzaminie przesunęły się o mniej niż 1,5% w obie strony (Ridge 377,2 → 374,0,
-ARIMAX 400,2 → 405,8), więc powodem zmiany była poprawność doboru cech, a nie zysk w błędzie. Efekt promocji w regresji
-wynosi teraz +2 122 szt.
-
+**Usunięcie rabatu (trzecia próba).** Rabat wynika wprost z promocji (bez promocji wynosi 0–10%, z promocją 10–25%), więc po
+zsumowaniu do poziomu dnia to prawie ta sama informacja (korelacja 0,97). Model nie potrafił rozdzielić wpływu jednego
+i drugiego, a wpływ rabatu wychodził nieistotny (p = 0,66) i do tego ujemny, co nie ma sensu. Usunęliśmy rabat ze
+wszystkich modeli i od nowa dobraliśmy ustawienia na próbnych egzaminach. **Żadne ustawienie się nie zmieniło**, zmieniły
+się tylko wagi w średniej ważonej (0,25 / 0,10 / 0,65 zamiast 0,35 / 0,10 / 0,55). Wyniki egzaminu przesunęły się o mniej
+niż 1,5% w jedną lub drugą stronę (Ridge 377,2 → 374,0, ARIMAX 400,2 → 405,8). Rabat usunęliśmy więc dlatego, że tak jest
+poprawnie, a nie dlatego, że poprawiło to wynik. Wpływ promocji wynosi teraz +2 122 szt. dziennie.
 
 ## Ograniczenia
 
-- **Wariant oracle.** Wyniki zakładają znajomość epidemii, promocji i pogody z góry. W praktyce znamy promocje, ale nie
-  epidemię ani pogodę na kilka tygodni, więc realny błąd byłby większy. Scenariusze pokazują skalę tej niepewności.
-- **Bias.** Wszystkie modele zawyżają prognozę na styczeń 2024 (styczeń ma ujemny efekt sezonowy). Ensemble go nie usuwa,
-  bo składniki mylą się w tę samą stronę.
-- **Egzamin liczony trzy razy.** Pierwszy raz na modelach dobranych w ciemno, drugi po dołożeniu cyklu rocznego do Ridge,
-  trzeci po usunięciu rabatu. Każda decyzja zapadła wyłącznie na walidacji kroczącej na treningu, ale po zobaczeniu
-  wcześniejszego wyniku egzaminacyjnego. Tabele w tym pliku pokazują więc **trzecią próbę**. Jedyne liczby z czystego,
-  ślepego pomiaru to baseline'y. Przy kolejnej zmianie modeli trzeba wyznaczyć nowy okres testowy.
-- **Jeden okres egzaminacyjny** (28 dni, z krótkim okresem epidemii na początku). Różnice rzędu kilku procent między
-  modelami nie są rozstrzygające.
-- **Pasmo niepewności** pochodzi z walidacji bez stycznia, ma stałą szerokość i nie zna biasu z egzaminu.
-- **Prognozy dla produktów** pochodzą z modelu dobranego na sumie, bez własnej walidacji na poziomie produktu.
-
+- **Modele znały przyszłe epidemię, promocje i pogodę.** W praktyce znamy z góry promocje, ale nie epidemię ani pogodę na
+  kilka tygodni, więc prawdziwy błąd byłby większy. Scenariusze epidemii pokazują, o ile.
+- **Modele przeszacowują styczeń 2024.** Połączenie modeli tego nie naprawia, bo wszystkie mylą się w tę samą stronę.
+- **Egzamin był liczony trzy razy.** Pierwszy raz na modelach dobranych w ciemno, drugi po dodaniu krzywej rocznej do
+  Ridge, trzeci po usunięciu rabatu. Każdą decyzję podjęliśmy na podstawie próbnych egzaminów, ale już po zobaczeniu
+  wcześniejszego wyniku. To trochę jak z uczniem, który zna już pytania z egzaminu: nawet jeśli uczy się uczciwie, trudno
+  wykluczyć, że podświadomie przygotował się pod te konkretne pytania. Tabele pokazują więc **trzecie podejście**, a jedyne
+  wyniki z pierwszego, „ślepego” podejścia to wyniki prostych metod. Przy kolejnej zmianie modeli trzeba sprawdzać je na
+  nowym okresie.
+- **Był tylko jeden egzamin**: 28 dni, w tym kilka dni epidemii na początku. Różnice między modelami rzędu kilku procent
+  nie przesądzają, który jest lepszy.
+- **Pasmo niepewności** powstało z próbnych egzaminów, w których nie było stycznia, ma stałą szerokość i nie uwzględnia
+  tego, że modele przeszacowują styczeń.
+- **Prognozy dla produktów** pochodzą z modelu dobranego pod łączną sprzedaż i nie przeszły osobnych próbnych egzaminów
+  na poziomie produktu.
 
 ## Uruchomienie
 
 ```bash
-python -m src.run_all                 # cały pipeline od zera (ok. 1 min) → outputs/ + tabele w dokumentach
+python -m src.run_all                 # wszystko od zera (ok. 1 min) → pliki w outputs/ + tabele w tym pliku
 streamlit run app/streamlit_app.py    # aplikacja na http://localhost:8501
-python -m unittest discover -v        # testy (te wymagające danych są pomijane, gdy nie ma CSV)
+python -m unittest discover -v        # testy (te, które potrzebują danych, są pomijane, gdy nie ma pliku CSV)
 ```
 
-Wyniki są deterministyczne (`random_state=42`). Każdy krok można uruchomić osobno (`python -m src.<nazwa>`), kolejność
-i zależności widać w `src/run_all.py`. Parametry modeli w `config.py` wyszły z przeszukiwania siatek walidacją kroczącą,
-które nie wchodzi do `run_all` (`python -m src.arimax`, `.ridge`, `.lgbm`, `.ensemble`); wynik wpisuje się ręcznie do
-`config.py`.
+Wyniki są za każdym razem takie same (stałe ziarno losowości `random_state=42`). Każdy krok można uruchomić osobno
+(`python -m src.<nazwa>`), a ich kolejność widać w `src/run_all.py`.
+
+Ustawienia modeli w `config.py` wybrało przeszukiwanie wielu kombinacji na próbnych egzaminach. Nie jest ono częścią
+`run_all`, bo trwa dłużej. Uruchamia się je osobno (`python -m src.arimax`, `.ridge`, `.lgbm`, `.ensemble`), a wynik
+wpisuje ręcznie do `config.py`.
 
 ## Aplikacja webowa
 
-Aplikacja (Streamlit + Plotly) nie potrzebuje pliku z danymi: niczego nie uczy, tylko wczytuje gotowe pliki z `outputs/`
-i wywołuje wspólną funkcję metryk.
+Aplikacja (Streamlit + Plotly) nie potrzebuje pliku z danymi. Niczego nie uczy, tylko wczytuje gotowe wyniki z `outputs/`.
 
-- **Wykres:** rzeczywista sprzedaż, prognoza modelu, pasmo 80%, baseline (średnia z 28 dni) i dni z epidemią.
-- **Metryki:** wybrany model obok baseline'ów, także osobno dla dni z epidemią i bez.
-- **Fragmentatory:** widok (suma albo jeden z trzech produktów), model, zakres dat i scenariusz długości epidemii.
-- W nagłówku widnieje oznaczenie **wariant oracle**.
+- **Wykres:** rzeczywista sprzedaż, prognoza wybranego modelu, pasmo 80%, średnia z 28 dni dla porównania i zaznaczone dni
+  epidemii.
+- **Błędy:** wybrany model obok prostych metod, także osobno dla dni z epidemią i bez niej.
+- **Filtry:** cała sieć albo jeden z trzech produktów, model, zakres dat i scenariusz długości epidemii.
+- W nagłówku jest przypomnienie, że to **wariant oracle** (modele znały przyszłą epidemię, promocje i pogodę).
 
 ## Kontener i wdrożenie
 
-`Dockerfile` buduje obraz z kodem i gotowymi wynikami (bez pliku z danymi i bez bibliotek do uczenia,
-`requirements-app.txt`):
+`Dockerfile` buduje obraz z kodem i gotowymi wynikami. Nie ma w nim pliku z danymi ani bibliotek potrzebnych do uczenia
+modeli (tylko to, co w `requirements-app.txt`):
 
 ```bash
 docker build -t forecast-app .
 docker run --rm -p 127.0.0.1:8501:8501 forecast-app     # http://localhost:8501
 ```
-
