@@ -172,7 +172,7 @@ Błąd w walidacji kroczącej (na treningu) i na egzaminie:
 | LightGBM | 385,4 | 390,7 |
 <!-- END:validation -->
 
-## Bonus: prognozy dla trzech najlepiej sprzedających się produktów
+## Prognozy dla trzech najlepiej sprzedających się produktów
 
 Wybrane produkty (najwyższa średnia dzienna sprzedaż **w okresie treningowym**): <!-- BEGIN:bonus_products -->
 **P0007**, **P0013**, **P0004**
@@ -330,56 +330,3 @@ docker build -t forecast-app .
 docker run --rm -p 127.0.0.1:8501:8501 forecast-app     # http://localhost:8501
 ```
 
-### Wdrożenie na serwer (GitHub Actions)
-
-Workflow `.github/workflows/deploy_app.yaml` uruchamia się **tylko ręcznie** (zakładka *Actions* → *deploy app* →
-*Run workflow*). Buduje obraz na runnerze GitHuba, przesyła go na serwer przez SSH (`docker save | docker load`)
-i podmienia kontener `forecast-app` na porcie 8501. Kontener ma system plików tylko do odczytu, nie ma uprawnień jądra
-(`cap-drop ALL`) i sam wstaje po restarcie serwera. Wdrożenie kończy się błędem, jeśli healthcheck z `Dockerfile` nie
-potwierdzi, że aplikacja działa.
-
-HTTPS i reverse proxy zapewnia subdomena z panelu Mikrusa, która przekazuje ruch na port 8501, więc na serwerze działa
-jeden kontener, bez Caddy ani nginx.
-
-Wymagania:
-
-- sekrety repozytorium (*Settings* → *Secrets and variables* → *Actions*): `DEPLOY_SSH` (klucz prywatny SSH),
-  `DEPLOY_HOST` (adres serwera), `DEPLOY_PORT` (port SSH), `DEPLOY_USER` (użytkownik SSH),
-- na serwerze: zainstalowany Docker, klucz publiczny w `~/.ssh/authorized_keys` użytkownika `DEPLOY_USER`,
-- w panelu Mikrusa: subdomena skierowana na port 8501 (inny port: zmienna `APP_PORT` w workflow).
-
-## Struktura repozytorium
-
-```
-.
-├── config.py            cała konfiguracja: ścieżki, kolumny, daty podziału, horyzont, parametry modeli
-├── src/                 logika: dane, cechy, metryki, modele, walidacja, ensemble, pasma, scenariusze, audyt
-├── app/                 aplikacja Streamlit (streamlit_app.py, charts.py, style.css)
-├── outputs/             gotowe wyniki: prognozy, metryki, agregaty (bez surowych danych)
-├── tests/               testy (unittest)
-├── .streamlit/          motyw aplikacji (config.toml)
-├── requirements.txt     zależności całego projektu; requirements-app.txt: tylko aplikacja (obraz Dockera)
-├── Dockerfile           obraz aplikacji (tylko requirements-app.txt i gotowe wyniki)
-└── .github/workflows/   deploy_app.yaml: ręczne wdrożenie na serwer przez SSH
-```
-
-## Dziennik eksperymentów
-
-Skrócony zapis kolejnych kroków. Parametry i wagi zawsze wybierała walidacja krocząca na treningu; wyniki na egzaminie
-(wariant *oracle*) liczono dla ustalonych modeli.
-
-| Data | Krok | Wynik i wniosek |
-|---|---|---|
-| 2026-09-21 | eksploracja treningu (`src.explore`) | epidemia −36,6% sprzedaży, brak rytmu tygodniowego; cena poza modelami (podąża za popytem) |
-| 2026-09-21 | baseline'y | MAE: średnia 28 dni 1 053,5, naive 2 460, seasonal naive 2 595; naive mylą się o ok. 3 000 szt. po końcu epidemii |
-| 2026-09-21 | ARIMAX i SARIMAX | rząd (0,1,1); pamięć błędów obniża MAE w walidacji z 387 do 312; sezonowość tygodniowa nie pomaga |
-| 2026-09-21 | Ridge i LightGBM | `alpha` = 30; LightGBM 15 liści, 200 drzew; oba pobijają baseline'y o ok. 63% |
-| 2026-09-21 | ensemble ARIMAX + LightGBM + Ridge | wagi z prognoz out-of-fold; nie pobił najlepszego składnika, nie zmniejsza biasu |
-| 2026-09-21 | porównanie modeli | sześć modeli w wąskim paśmie MAE; kolejność z jednego egzaminu nierozstrzygająca |
-| 2026-09-21 | bonus: 3 najlepsze produkty | P0007, P0013, P0004 (z treningu); LightGBM najlepszy dla każdego |
-| 2026-09-21 | pasma 80% i scenariusze epidemii | pokrycie 68–75%; każdy dzień epidemii obniża sumę 28 dni o ok. 3 400 szt. |
-| 2026-09-22 | audyt (`src.audit`) | metryki i podział poprawne, brak wycieku; znaleziono pominiętą sezonowość roczną jako przyczynę biasu |
-| 2026-09-23 | cykl roczny w Ridge | walidacja 380,6 → 301,7, egzamin 372,0 → 374,0; w LightGBM nie wdrożony |
-| 2026-09-23 | audyt danych i kodu od zera | 19 sprawdzeń zgodnych; wykryta współliniowość rabatu z promocją |
-| 2026-09-23 | usunięcie rabatu | ustawienia bez zmian, wagi ensemble przesunięte, MAE na egzaminie w granicach szumu (trzeci pomiar) |
-| 2026-09-23 | udokumentowany wybór trójki produktów | trening i całość danych dają różne trójki; zostaje ranking z treningu |
