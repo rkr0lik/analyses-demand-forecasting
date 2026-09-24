@@ -1,0 +1,6 @@
+# Zależności samej aplikacji webowej (obraz Dockera). To podzbiór requirements.txt z tymi samymi wersjami:
+# aplikacja tylko wczytuje gotowe wyniki, więc nie potrzebuje statsmodels, scikit-learn ani lightgbm.
+pandas==3.0.6
+numpy==2.5.3
+plotly==7.1.0
+streamlit==1.64.0

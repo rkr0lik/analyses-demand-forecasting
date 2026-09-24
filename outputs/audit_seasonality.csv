@@ -1,0 +1,5 @@
+wariant,MAE,Bias,alpha
+bez sezonowości rocznej,380.62573878039393,-31.10546589868433,30.0
+z sezonowością roczną (1 para fal),356.873035413158,-31.729669685450176,30.0
+z sezonowością roczną (2 pary fal),309.0248205924306,-70.46413393652148,30.0
+z sezonowością roczną (3 pary fal) — obecny model,301.74102963787885,-56.89940980082292,30.0

@@ -1,0 +1,14 @@
+# Motyw w stylu raportu Power BI: jasne szare tło strony, białe karty, niebieski akcent.
+[theme]
+base = "light"
+primaryColor = "#118DFF"
+backgroundColor = "#F3F2F1"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#252423"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

@@ -1,0 +1,31 @@
+/* Wygląd zbliżony do raportu Power BI: szare tło strony, białe karty z cienką ramką, ciemny pasek nagłówka. */
+.stApp { background: #F3F2F1; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #252423; }
+[data-testid="stHeader"] { display: none; }
+.block-container { max-width: 1440px; padding: 0 1.5rem 2rem 1.5rem; }
+
+/* Pasek nagłówka */
+.pbi-header { background: #252423; color: #fff; margin-top: -1rem; margin-bottom: 16px; display: flex; align-items: center; gap: 8px 16px;
+  flex-wrap: wrap; width: 100vw; margin-left: calc(50% - 50vw); padding: 14px max(24px, calc((100vw - 1440px) / 2 + 24px)); }
+.pbi-title { font-size: 20px; font-weight: 600; }
+.pbi-sub { font-size: 12px; color: #C8C6C4; }
+.pbi-tag { background: #F2C811; color: #252423; font-size: 11px; font-weight: 700; padding: 2px 8px;
+  border-radius: 2px; text-transform: uppercase; letter-spacing: .04em; }
+
+/* Karty (kontenery z kluczem card_*) */
+[class*="st-key-card"] { background: #fff; border: 1px solid #E1DFDD; border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .06); padding: 12px 16px; }
+.card-title { font-size: 13px; font-weight: 600; color: #252423; margin-bottom: 4px; }
+.card-sub { font-size: 12px; color: #605E5C; margin-bottom: 4px; }
+
+/* Karty KPI: duża liczba, podpis pod nią */
+.kpi-value { font-size: 34px; font-weight: 300; line-height: 1.15; color: #252423; }
+.kpi-label { font-size: 12px; color: #605E5C; margin-top: 2px; padding-bottom: 6px; }
+
+/* Widżety w kartach bez własnych etykiet i zbędnych odstępów */
+[class*="st-key-card"] [data-testid="stWidgetLabel"] { display: none; }
+[class*="st-key-card"] .stSlider { padding-top: 4px; }
+[data-testid="stExpander"] { background: #fff; border: 1px solid #E1DFDD; border-radius: 2px; }
+
+/* Równe wysokości kart w rzędach */
+[class*="st-key-card_slicer"] { min-height: 122px; }
+.st-key-card_chart, .st-key-card_table { min-height: 520px; }

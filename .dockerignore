@@ -1,0 +1,14 @@
+# Biała lista: do obrazu trafia tylko to, czego potrzebuje aplikacja. Plik z danymi (demand_forecasting.csv),
+# testy, historia gita, środowisko wirtualne i pliki lokalne nie mają jak się tam znaleźć.
+*
+
+!requirements-app.txt
+!config.py
+!src/
+!app/
+!.streamlit/
+!outputs/
+
+# Wyjątki w wyjątkach
+**/__pycache__
+**/*.pyc

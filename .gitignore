@@ -1,0 +1,17 @@
+# Narzędzia i konfiguracja lokalna
+.claude/
+.agents/
+skills-lock.json
+CLAUDE.md
+
+# Dane (plik CSV nie trafia do repozytorium; wskazówka w README, gdzie go położyć)
+demand_forecasting.csv
+
+# Lokalna konfiguracja wdrożenia (domena); wzór: .env.example
+.env
+
+# Środowisko Pythona
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

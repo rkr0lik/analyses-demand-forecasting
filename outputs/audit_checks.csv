@@ -1,0 +1,7 @@
+sprawdzenie,wartość
+korelacja kolumny Demand ze sprzedażą,0.9813331003009831
+rozstęp efektu miesiąca (szt./dzień),783.8914627839499
+rozstęp efektu miesiąca jako % sprzedaży,8.810076297959943
+test stacjonarności reszt regresji (p),0.000470497206805707
+dni poniżej pasma (wszystkie modele razem),38.0
+dni powyżej pasma (wszystkie modele razem),1.0
